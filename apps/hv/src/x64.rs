@@ -4,6 +4,8 @@ use core::{fmt::{Debug, Formatter, Result}, marker::PhantomData};
 use libax::hv::{HyperCraftHal, HyperCraftHalImpl, GuestPhysAddr, HostPhysAddr, HostVirtAddr, phys_to_virt, virt_to_phys, Result as HyperResult, Error, GuestPageTable, GuestPageTableTrait, PerCpuDevices, VCpu, VmExitInfo, PerVmDevices};
 
 use page_table_entry::MappingFlags;
+use vm_config::VmConfigEntry;
+use alloc::vec::Vec;
 
 macro_rules! cfg_block {
     ($( #[$meta:meta] {$($item:item)*} )*) => {
@@ -227,10 +229,11 @@ fn load_guest_image(id: usize, hpa: HostPhysAddr, load_gpa: GuestPhysAddr, size:
 }
 
 #[cfg(target_arch = "x86_64")]
-pub fn setup_gpm(id: usize) -> HyperResult<GuestPhysMemorySet> {
+pub fn setup_gpm(id: usize, config: VmConfigEntry) -> HyperResult<GuestPhysMemorySet> {
+    let image_config = &config.image;
     // copy BIOS and guest images
-
-    load_guest_image(id, BIOS_PADDR, BIOS_ENTRY, BIOS_SIZE);
+    // load_guest_image(id, BIOS_PADDR, BIOS_ENTRY, BIOS_SIZE);
+    load_guest_image(id, image_config.bios_paddr, image_config.bios_entry, image_config.bios_size);
     #[cfg(feature = "guest_nimbos")]
     {
         load_guest_image(id, GUEST_IMAGE_PADDR, GUEST_ENTRY, GUEST_IMAGE_SIZE);
@@ -238,6 +241,29 @@ pub fn setup_gpm(id: usize) -> HyperResult<GuestPhysMemorySet> {
     
     // create nested page table and add mapping
     let mut gpm = GuestPhysMemorySet::new()?;
+    // the first region is physical memory, skip it and manually map it by virt_to_phys
+    let memory_config = &config.memory;
+    let guest_memory_regions: Vec<GuestMemoryRegion> = memory_config.regions.iter().skip(1).map(|region| {
+        GuestMemoryRegion {
+            gpa: region.ipa_start,
+            hpa: region.pa_start,
+            size: region.length,
+            flags: MappingFlags::from_bits(region.flags).unwrap_or_else(|| panic!("Invalid flags")),
+        }
+    }).collect();
+    for r in guest_memory_regions {
+        gpm.map_region(r.into())?;
+    }
+    let physical_memory_region = memory_config.regions.first().unwrap();
+    let guest_physical_memory = GuestMemoryRegion {
+        gpa: physical_memory_region.ipa_start,
+        hpa: virt_to_phys((gpa_as_mut_ptr(id, physical_memory_region.ipa_start) as HostVirtAddr).into()).into(),
+        size: physical_memory_region.length,
+        flags: MappingFlags::from_bits(physical_memory_region.flags).unwrap_or_else(|| panic!("Invalid flags")),
+    };
+    gpm.map_region(guest_physical_memory.into())?;
+
+    /* 
     let guest_memory_regions = [
         GuestMemoryRegion {
             // Low RAM
@@ -306,5 +332,6 @@ pub fn setup_gpm(id: usize) -> HyperResult<GuestPhysMemorySet> {
     for r in guest_memory_regions.into_iter() {
         gpm.map_region(r.into())?;
     }
+    */
     Ok(gpm)
 }

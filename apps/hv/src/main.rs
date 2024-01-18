@@ -30,6 +30,7 @@ use libax::{
 
 use page_table_entry::MappingFlags;
 
+use vm_config::create_default_vm_config_entry;
 #[cfg(target_arch = "x86_64")]
 use device::{X64VcpuDevices, X64VmDevices};
 
@@ -102,18 +103,23 @@ fn main(hart_id: usize) {
     #[cfg(target_arch = "x86_64")]
     {
         println!("into main {}", hart_id);
+        
+        let vm_config = create_default_vm_config_entry();
+        let image_config = vm_config.image.clone();
 
         let mut p = PerCpu::<HyperCraftHalImpl>::new(hart_id);
         p.hardware_enable().unwrap();
 
-        let gpm = x64::setup_gpm(hart_id).unwrap();
+        let gpm = x64::setup_gpm(hart_id, vm_config.clone()).unwrap();
         let npt = gpm.nest_page_table_root();
-        info!("{:#x?}", gpm);
+        info!("setup gpm: {:#x?}", gpm);
 
         let mut vcpus = VmCpus::<HyperCraftHalImpl, X64VcpuDevices<HyperCraftHalImpl>>::new();
-        vcpus.add_vcpu(VCpu::new(0, p.vmcs_revision_id(), 0x7c00, npt).unwrap());
-        
+        // vcpus.add_vcpu(VCpu::new(0, p.vmcs_revision_id(), 0x7c00, npt).unwrap());
+        vcpus.add_vcpu(VCpu::new(0, p.vmcs_revision_id(), image_config.bios_entry, npt).unwrap(), vm_config.clone());
+
         let mut vm = VM::<HyperCraftHalImpl, X64VcpuDevices<HyperCraftHalImpl>, X64VmDevices<HyperCraftHalImpl>>::new(vcpus);
+        // TODO: according to config to add more vcpu
         vm.bind_vcpu(0);
 
         if hart_id == 0 {

@@ -12,6 +12,7 @@ guest_linux = []
 [dependencies]
 libax = { path = "../../ulib/libax", features = ["alloc", "hv"] }
 page_table_entry = { path = "../../crates/page_table_entry" }
+vm_config = { path = "../../crates/vm_config"}
 fdt = {version = "0.1.5"}
 arrayvec = { version = "0.7.2", default-features = false }
 bit_field = "0.10"

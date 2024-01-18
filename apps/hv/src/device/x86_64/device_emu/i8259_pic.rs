@@ -6,6 +6,7 @@ use libax::hv::{Result as HyperResult, Error as HyperError};
 
 pub struct I8259Pic {
     port_base: u16,
+    port_range: u16,
     icw1: u8,
     offset: u8,
     icw3: u8,
@@ -17,7 +18,8 @@ pub struct I8259Pic {
 
 impl PortIoDevice for I8259Pic {
     fn port_range(&self) -> core::ops::Range<u16> {
-        self.port_base..self.port_base + 2
+        // self.port_base..self.port_base + 2
+        self.port_base..self.port_base + self.port_range
     }
 
     fn read(&mut self, port: u16, _access_size: u8) -> HyperResult<u32> {
@@ -69,9 +71,10 @@ impl PortIoDevice for I8259Pic {
 }
 
 impl I8259Pic {
-    pub const fn new(port_base: u16) -> Self {
+    pub const fn new(port_base: u16, port_range: u16) -> Self {
         Self {
             port_base,
+            port_range,
             icw1: 0,
             offset: 0,
             icw3: 0,

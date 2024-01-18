@@ -50,6 +50,7 @@ members = [
     "crates/timer_list",
     "crates/tuple_for_each",
     "crates/hypercraft",
+    "crates/vm_config",
 
     "modules/axalloc",
     "modules/axconfig",

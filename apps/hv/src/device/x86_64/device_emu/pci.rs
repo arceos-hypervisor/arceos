@@ -4,6 +4,7 @@ use libax::hv::{Result as HyperResult, Error as HyperError};
 
 pub struct PCIConfigurationSpace {
     port_base: u16,
+    port_range: u16,
     current_address: u64,
 }
 
@@ -13,14 +14,15 @@ const CONFIGURATION_SPACE_DATA_PORT_OFFSET: usize = 4;
 const CONFIGURATION_SPACE_DATA_PORT_LAST_OFFSET: usize = 7;
 
 impl PCIConfigurationSpace {
-    pub fn new(port_base: u16) -> Self {
-        Self { port_base, current_address: 0 }
+    pub fn new(port_base: u16, port_range: u16) -> Self {
+        Self { port_base, port_range, current_address: 0 }
     }
 }
 
 impl PortIoDevice for PCIConfigurationSpace {
     fn port_range(&self) -> core::ops::Range<u16> {
-        return self.port_base..self.port_base + 8
+        // return self.port_base..self.port_base + 8
+        return self.port_base..self.port_base + self.port_range
     }
 
     fn read(&mut self, port: u16, access_size: u8) -> HyperResult<u32> {

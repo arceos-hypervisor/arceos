@@ -160,6 +160,7 @@ impl VirtualConsoleBackend for MultiplexConsoleBackend {
 
 pub struct Uart16550<B: VirtualConsoleBackend = DefaultConsoleBackend> {
     port_base: u16,
+    port_range: u16,
     fifo: Mutex<Fifo<UART_FIFO_CAPACITY>>,
     line_control_reg: u8,
     backend: B,
@@ -167,7 +168,8 @@ pub struct Uart16550<B: VirtualConsoleBackend = DefaultConsoleBackend> {
 
 impl<B: VirtualConsoleBackend> PortIoDevice for Uart16550<B> {
     fn port_range(&self) -> core::ops::Range<u16> {
-        self.port_base..self.port_base + 8
+        // self.port_base..self.port_base + 8
+        self.port_base..self.port_base + self.port_range
     }
 
     fn read(&mut self, port: u16, access_size: u8) -> HyperResult<u32> {
@@ -233,9 +235,10 @@ impl<B: VirtualConsoleBackend> PortIoDevice for Uart16550<B> {
 }
 
 impl<B: VirtualConsoleBackend> Uart16550<B> {
-    pub fn new(port_base: u16) -> Self {
+    pub fn new(port_base: u16, port_range: u16) -> Self {
         Self {
             port_base,
+            port_range,
             fifo: Mutex::new(Fifo::new()),
             line_control_reg: 0,
             backend: B::new(),
