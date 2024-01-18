@@ -1,5 +1,5 @@
 [submodule "crates/hypercraft"]
 	path = crates/hypercraft
-	url = https://github.com/915604903T/hypercraft-x86.git
+	url = https://github.com/915604903T/hypercraft
 [submodule "crates/hypercraft/"]
 	url = https://github.com/915604903T/hypercraft
