@@ -3,6 +3,7 @@ use crate::{from_hex, MAX_BASE_CNT};
 use core::fmt;
 use heapless::Vec;
 use serde::de::{self, Deserializer, Visitor};
+use super::pci_dev::PCIDevice;
 
 const MAX_PASSTHROUGH_DEVICE_PER_VM: usize = 32;
 
@@ -46,20 +47,6 @@ where
     ret
 }
 
-#[derive(Clone, Debug, serde::Deserialize)]
-pub struct PCIDevice {
-    pub device_type: u8,
-    pub domain: u16,
-    pub bdf: u16,
-    pub bar_mask: [u32; 6],
-    // pub caps_start: u16,
-    // pub num_caps: u16,
-    // pub num_msi_vectors: u8,
-    // pub msi_64bits: u8,
-    // pub num_msix_vectors: u16,
-    // pub msix_region_size: u16,
-    // pub msix_address: u64,
-}
 
 #[derive(Clone, Debug, serde::Deserialize)]
 pub struct PortDevice {
@@ -67,12 +54,12 @@ pub struct PortDevice {
     pub range: Vec<usize, MAX_BASE_CNT>,
 }
 
-#[derive(Clone, Debug, serde::Deserialize)]
+#[derive(Clone, Debug)]
 pub struct VmPassthroughDeviceConfig {
     pub mmio: Option<VmMemoryRegion>,
     pub pci: Option<PCIDevice>,
     pub port: Option<PortDevice>,
-    #[serde(deserialize_with = "from_device_type")]
+    // #[serde(deserialize_with = "from_device_type")]
     pub device_type: PassthroughDeviceType,
 }
 
@@ -107,7 +94,7 @@ impl VmPassthroughDeviceConfig {
     }
 }
 
-#[derive(serde::Deserialize, Debug, Clone)]
+#[derive(Debug, Clone)]
 pub struct VmPassthroughDeviceConfigList {
     pub passthrough_dev_list: Vec<VmPassthroughDeviceConfig, MAX_PASSTHROUGH_DEVICE_PER_VM>,
 }

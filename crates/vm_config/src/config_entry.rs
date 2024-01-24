@@ -6,7 +6,7 @@ use super::passthrough_dev_config::VmPassthroughDeviceConfigList;
 use crate::NAME_MAX_LENGTH;
 use heapless::String;
 
-#[derive(Clone, Debug, serde::Deserialize)]
+#[derive(Clone, Debug)]
 pub struct VmConfigEntry {
     /// vm id
     pub id: usize,

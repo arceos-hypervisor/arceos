@@ -1839,6 +1839,7 @@ dependencies = [
  "log",
  "serde",
  "serde-json-core",
+ "spin 0.9.8",
 ]
 
 [[package]]

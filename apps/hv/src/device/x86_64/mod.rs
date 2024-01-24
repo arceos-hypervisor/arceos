@@ -10,7 +10,8 @@ use libax::hv::{Error as HyperError, VmExitInfo as VmxExitInfo, HyperCraftHalImp
 
 use device_emu::{VirtMsrDevice, PortIoDevice, Bundle, VirtLocalApic, ApicBaseMsrHandler};
 
-use vm_config::{VmConfigEntry, EmuDeviceType, DeviceType, PassthroughDeviceType};
+use vm_config::{DeviceType, EmuDeviceType, PCIDevice, PassthroughDeviceType, VmConfigEntry};
+use device_emu::pci_dev::PCI_DEVICES;
 
 const VM_EXIT_INSTR_LEN_RDMSR: u8 = 2;
 const VM_EXIT_INSTR_LEN_WRMSR: u8 = 2;
@@ -172,7 +173,7 @@ pub struct X64VcpuDevices<H: HyperCraftHal> {
 
 impl<H: HyperCraftHal> PerCpuDevices<H> for X64VcpuDevices<H> {
     fn new(vcpu: &VCpu<H>, config: VmConfigEntry) -> HyperResult<Self> {
-        /* 
+        
         let mut devices = DeviceList::new();
         let mut pic: Vec<Arc<Mutex<device_emu::I8259Pic>>> = Vec::new(); 
 
@@ -200,7 +201,8 @@ impl<H: HyperCraftHal> PerCpuDevices<H> for X64VcpuDevices<H> {
                     }
                 },
                 EmuDeviceType::EmuDevicePCI => {
-                    let pci_config_space = device_emu::PCIConfigurationSpace::new(emu_dev.base[0] as _, emu_dev.range[0] as _);
+                    // let pci_config_space = device_emu::PCIConfigurationSpace::new(emu_dev.base[0] as _, emu_dev.range[0] as _);
+                    let pci_config_space = device_emu::PCIPassthrough::new(emu_dev.base[0] as _);
                     devices.add_port_io_device(Arc::new(Mutex::new(pci_config_space)));
                 },
                 EmuDeviceType::EmuDeviceDebugPort => {
@@ -251,8 +253,42 @@ impl<H: HyperCraftHal> PerCpuDevices<H> for X64VcpuDevices<H> {
         for passthrough_dev in &passthrough_dev_config.passthrough_dev_list {
             match passthrough_dev.device_type {
                 PassthroughDeviceType::PCI => {
-                    let pci_info = passthrough_dev.pci.clone().unwrap();
-                    debug!("TODOOO this is pci info:\n {:?}", pci_info);
+                    let pci_device = passthrough_dev.pci.clone().unwrap();
+                    let bdf: u32  =  (pci_device.bus<<16) | (pci_device.slot<<11) | (pci_device.func<<8);
+                    /* 
+                    let pci_dev = PCIDevice {
+                        vendor_id: pci_info.vendor_id,
+                        device_id: pci_info.device_id,
+                        command: pci_info.command,
+                        status: pci_info.status,
+                        revision_id_class_code: pci_info.revision_id_class_code,
+                        cacheline_size: pci_info.cacheline_size,
+                        latency_timer: pci_info.latency_timer,
+                        header_type: pci_info.header_type,
+                        bist: pci_info.bist,
+                        bar: pci_info.bar,
+                        cardbus_cis_pointer: pci_info.cardbus_cis_pointer,
+                        subsystem_vendor_id: pci_info.subsystem_vendor_id,
+                        subsystem_id: pci_info.subsystem_id,
+                        expansion_rom_base_address: pci_info.expansion_rom_base_address,
+                        capabilities_pointer: pci_info.capabilities_pointer,
+                        _reserved1: 0,
+                        _reserved2: 0,
+                        interrupt_line: pci_info.interrupt_line,
+                        interrupt_pin: pci_info.interrupt_pin,
+                        min_gnt: pci_info.min_gnt,
+                        max_lat: pci_info.max_lat,
+                        capabilities: pci_info.capabilities,
+
+                        bar_size: pci_info.bar_size,
+                        expansion_rom_base_address_size: pci_info.expansion_rom_base_address_size,
+                        msix_address: pci_info.msix_address,
+                        msix_region_size: pci_info.msix_region_size,
+                        num_msix_vectors: pci_info.num_msix_vectors,
+
+                    };*/
+                    let mut pci_devices = PCI_DEVICES.write();
+                    pci_devices.insert(bdf, pci_device);
                 },
                 PassthroughDeviceType::PORT => {
                     let port_info = passthrough_dev.port.clone().unwrap();
@@ -278,8 +314,8 @@ impl<H: HyperCraftHal> PerCpuDevices<H> for X64VcpuDevices<H> {
             pic,
             last: None,
             marker: PhantomData,
-        })*/
-
+        })
+/* 
         let mut apic_timer = Arc::new(Mutex::new(VirtLocalApic::new()));
         let mut bundle = Arc::new(Mutex::new(Bundle::new()));
         let mut console = Arc::new(Mutex::new(device_emu::Uart16550::<device_emu::MultiplexConsoleBackend>::new(0x3f8, 8)));
@@ -315,8 +351,8 @@ impl<H: HyperCraftHal> PerCpuDevices<H> for X64VcpuDevices<H> {
             Arc::new(Mutex::new(device_emu::Dummy::new(0x87, 1))), // 0x87 is a port about dma
             Arc::new(Mutex::new(device_emu::Dummy::new(0x60, 1))), // 0x60 and 0x64 are ports about ps/2 controller
             Arc::new(Mutex::new(device_emu::Dummy::new(0x64, 1))), // 
-            Arc::new(Mutex::new(device_emu::PCIConfigurationSpace::new(0xcf8, 8))),
-            // Arc::new(Mutex::new(device_emu::PCIPassthrough::new(0xcf8))),
+            // Arc::new(Mutex::new(device_emu::PCIConfigurationSpace::new(0xcf8, 8))),
+            Arc::new(Mutex::new(device_emu::PCIPassthrough::new(0xcf8))),
         ];
 
         devices.add_port_io_devices(&mut pmio_devices);
@@ -333,7 +369,7 @@ impl<H: HyperCraftHal> PerCpuDevices<H> for X64VcpuDevices<H> {
             pic: pic.to_vec(),
             last: None,
             marker: PhantomData,
-        })
+        })*/
       
     }
 

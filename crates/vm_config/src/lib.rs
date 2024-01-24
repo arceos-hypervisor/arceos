@@ -7,6 +7,7 @@ extern crate alloc;
 extern crate heapless;
 extern crate serde;
 extern crate serde_json_core;
+extern crate spin;
 
 pub mod config_entry;
 pub mod cpu_config;
@@ -14,19 +15,30 @@ pub mod emulated_dev_config;
 pub mod image_config;
 pub mod memory_config;
 pub mod passthrough_dev_config;
+pub mod pci_dev;
+
+use alloc::sync::Arc;
+use spin::RwLock;
+use alloc::collections::BTreeMap;
 
 pub use config_entry::VmConfigEntry;
 
 pub use emulated_dev_config::{VmEmulatedDeviceConfig, VmEmulatedDeviceConfigList, EmuDeviceType, DeviceType};
+pub use pci_dev::{
+    PCIDevice, CapabilityEnum,
+    CapabilityDummy, CapabilityMsix, CapabilityMsi,
+};
 pub use passthrough_dev_config::{
     VmPassthroughDeviceConfig, VmPassthroughDeviceConfigList, 
-    PCIDevice, PortDevice, PassthroughDeviceType, 
+    PortDevice, PassthroughDeviceType, 
     PCI_TYPE_DEVICE};
 use memory_config::VmMemoryRegion;
 
 use core::fmt;
 use heapless::{String, Vec};
 use serde::de::{self, Deserializer, Visitor};
+
+use crate::pci_dev::ReadWriteStruct;
 
 const NAME_MAX_LENGTH: usize = 128;
 pub const MAX_BASE_CNT: usize = 4;
@@ -45,6 +57,7 @@ const EXECUTE: usize = 1 << 2;
 const USER: usize = 1 << 3;
 const DEVICE: usize = 1 << 4;
 
+/* 
 pub fn deserialize_vm_config_entry(config_json: &'static str) -> Option<VmConfigEntry> {
     let config: Result<(VmConfigEntry, usize), serde_json_core::de::Error> =
         serde_json_core::de::from_str(config_json);
@@ -57,6 +70,7 @@ pub fn deserialize_vm_config_entry(config_json: &'static str) -> Option<VmConfig
         }
     }
 }
+*/
 
 pub fn create_default_vm_config_entry() -> VmConfigEntry {
     debug!("create_default_vm_config_entry");
@@ -357,16 +371,354 @@ pub fn create_default_vm_config_entry() -> VmConfigEntry {
         Some(com1),
     );
     passthrough_dev_config_list.add_device_config(passthrough_com1);
-    // Virtio-9p
-    let pci_virtio = PCIDevice {
-        device_type: PCI_TYPE_DEVICE,
-        domain: 0x0000,
-        bdf: 0x00ff,
-        bar_mask: [
-            0xffffffe0, 0xfffff000, 0x00000000,
-			0x00000000, 0xffffc000, 0xffffffff,
-        ],
+    // unknown: 00:00:00
+    let capabilities:RwLock<BTreeMap<(u8, u8), CapabilityEnum>> = RwLock::new(BTreeMap::new());
+    let pci_unknown = PCIDevice {
+        vendor_id: 0x8086,  
+        device_id: 0x29c0,
+        command: 0x103,
+        status: 0x0,
+        revision_id_class_code: [0, 0, 0, 0x6],
+        cacheline_size: 0x0,
+        latency_timer: 0x0,
+        header_type: 0x0,
+        bist: 0x0,
+        bar: [0x0; 6],
+        cardbus_cis_pointer: 0x0,
+        subsystem_vendor_id: 0x1af4,
+        subsystem_id: 0x1100,
+        expansion_rom_base_address: 0x0,
+        capabilities_pointer: 0x0,
+        _reserved1: 0x0,
+        _reserved2: 0x0,
+        interrupt_line: 0x0,
+        interrupt_pin: 0x0,
+        min_gnt: 0x0,
+        max_lat: 0x0,
+        capabilities: Arc::new(capabilities),
+        
+        bar_size:[0x0; 6],
+        expansion_rom_base_address_size: 0x0,
+        num_msix_vectors: 0,
+        msix_region_size: 0x0,
+        msix_address: 0x0,
+        // device_type: PCI_TYPE_DEVICE,
+        
+        bus: 0,
+        slot: 0x0,
+        func: 0x0,
     };
+    let passthrough_pci_unknown = VmPassthroughDeviceConfig::new(
+        PassthroughDeviceType::PCI,
+        Some(pci_unknown),
+        None,
+        None,
+    );
+    passthrough_dev_config_list.add_device_config(passthrough_pci_unknown);
+    // unknown: 00:01:00
+    let capabilities:RwLock<BTreeMap<(u8, u8), CapabilityEnum>> = RwLock::new(BTreeMap::new());
+    let pci_unknown = PCIDevice {
+        vendor_id: 0x1234,  
+        device_id: 0x1111,
+        command: 0x103,
+        status: 0x0,
+        revision_id_class_code: [0x2, 0, 0, 0x3],
+        cacheline_size: 0x0,
+        latency_timer: 0x0,
+        header_type: 0x0,
+        bist: 0x0,
+        bar: [0xfd000008, 0x0, 0xfebd4000, 0x0, 0x0, 0x0],
+        cardbus_cis_pointer: 0x0,
+        subsystem_vendor_id: 0x1af4,
+        subsystem_id: 0x1100,
+        expansion_rom_base_address: 0xfebc0000,
+        capabilities_pointer: 0x0,
+        _reserved1: 0x0,
+        _reserved2: 0x0,
+        interrupt_line: 0x0,
+        interrupt_pin: 0x0,
+        min_gnt: 0x0,
+        max_lat: 0x0,
+        capabilities: Arc::new(capabilities),
+        
+        bar_size: [0xff000008, 0x0, 0xfffff000, 0x0, 0x0, 0x0],
+        expansion_rom_base_address_size: 0xffff0000,
+        num_msix_vectors: 0,
+        msix_region_size: 0x0,
+        msix_address: 0x0,
+        // device_type: PCI_TYPE_DEVICE,
+        
+        bus: 0,
+        slot: 0x1,
+        func: 0x0,
+    };
+    let passthrough_pci_unknown = VmPassthroughDeviceConfig::new(
+        PassthroughDeviceType::PCI,
+        Some(pci_unknown),
+        None,
+        None,
+    );
+    passthrough_dev_config_list.add_device_config(passthrough_pci_unknown);
+    // unknown: 00:02:00
+    let capabilities:RwLock<BTreeMap<(u8, u8), CapabilityEnum>> = RwLock::new(BTreeMap::new());
+    capabilities.write().insert(
+        (0xc8, 0xc8+ CapabilityDummy::struct_size()), 
+        CapabilityEnum::CapabilityDummy(
+            CapabilityDummy {
+                id: 0x01,
+                next_region: 0xd0,
+                control: 0x0,
+                unknown: 0x0,
+            }
+        ),
+    );
+    capabilities.write().insert(
+        (0xd0, 0xd0 + CapabilityMsi::struct_size()), 
+        CapabilityEnum::CapabilityMsi(
+            CapabilityMsi {
+                id: 0x05,
+                next_region: 0xe0,
+                message_control: 0x80,
+                message_address: 0x0,
+            }
+        ),
+    );
+    capabilities.write().insert(
+        (0xe0, 0xe0 + CapabilityDummy::struct_size()), 
+        CapabilityEnum::CapabilityDummy(
+            CapabilityDummy {
+                id: 0x10,
+                next_region: 0xa0,
+                control: 0x91,
+                unknown: 0x8000,
+            }
+        ),
+    );
+    capabilities.write().insert(
+        (0xa0, 0xa0 + CapabilityMsix::struct_size()), 
+        CapabilityEnum::CapabilityMsix(
+            CapabilityMsix {
+                id: 0x11,
+                next_region: 0x0,
+                message_control: 0x4,
+                table: 0x0,
+                pba: 0x0,
+            }
+        ),
+    );
+    let pci_unknown = PCIDevice {
+        vendor_id: 0x8086,  
+        device_id: 0x10d3,
+        command: 0x103,
+        status: 0x10,
+        revision_id_class_code: [0x0, 0, 0, 0x2],
+        cacheline_size: 0x0,
+        latency_timer: 0x0,
+        header_type: 0x0,
+        bist: 0x0,
+        bar: [0xfeb80000, 0xfeba0000, 0xc0c1, 0xfebd0000, 0x0, 0x0],
+        cardbus_cis_pointer: 0x0,
+        subsystem_vendor_id: 0x8086,
+        subsystem_id: 0x0,
+        expansion_rom_base_address: 0xfeb40000,
+        capabilities_pointer: 0xc8,
+        _reserved1: 0x0,
+        _reserved2: 0x0,
+        interrupt_line: 0xb,
+        interrupt_pin: 0x1,
+        min_gnt: 0x0,
+        max_lat: 0x0,
+        capabilities: Arc::new(capabilities),
+        
+        bar_size: [0xfffe0000, 0xfffe0000, 0xffffffe1, 0xffffc000, 0x0, 0x0],
+        expansion_rom_base_address_size: 0xfffc0000,
+        num_msix_vectors: 0,
+        msix_region_size: 0x0,
+        msix_address: 0x0,
+        // device_type: PCI_TYPE_DEVICE,
+        
+        bus: 0,
+        slot: 0x2,
+        func: 0x0,
+    };
+    let passthrough_pci_unknown = VmPassthroughDeviceConfig::new(
+        PassthroughDeviceType::PCI,
+        Some(pci_unknown),
+        None,
+        None,
+    );
+    passthrough_dev_config_list.add_device_config(passthrough_pci_unknown);
+    // unknown: 00:1f:00
+    let capabilities:RwLock<BTreeMap<(u8, u8), CapabilityEnum>> = RwLock::new(BTreeMap::new());
+    capabilities.write().insert(
+        (0x80, 0x80 + CapabilityMsi::struct_size()), 
+        CapabilityEnum::CapabilityMsi(
+            CapabilityMsi {
+                id: 0x05,
+                next_region: 0xa8,
+                message_control: 0x80,
+                message_address: 0x0,
+            }
+        ),
+    );
+    capabilities.write().insert(
+        (0xa8, 0xa8 + CapabilityDummy::struct_size()), 
+        CapabilityEnum::CapabilityDummy(
+            CapabilityDummy {
+                id: 0x12,
+                next_region: 0x0,
+                control: 0x0,
+                unknown: 0x0,
+            }
+        ),
+    );
+    let pci_unknown = PCIDevice {
+        vendor_id: 0x8086,  
+        device_id: 0x2918,
+        command: 0x103,
+        status: 0x0,
+        revision_id_class_code: [0x2, 0, 0x1, 0x6],
+        cacheline_size: 0x0,
+        latency_timer: 0x0,
+        header_type: 0x80,
+        bist: 0x0,
+        bar: [0x0; 6],
+        cardbus_cis_pointer: 0x0,
+        subsystem_vendor_id: 0x1af4,
+        subsystem_id: 0x1100,
+        expansion_rom_base_address: 0x0,
+        capabilities_pointer: 0x0,
+        _reserved1: 0x0,
+        _reserved2: 0x0,
+        interrupt_line: 0x0,
+        interrupt_pin: 0x0,
+        min_gnt: 0x0,
+        max_lat: 0x0,
+        capabilities: Arc::new(capabilities),
+        
+        bar_size: [0x0; 6],
+        expansion_rom_base_address_size: 0x0,
+        num_msix_vectors: 0,
+        msix_region_size: 0x0,
+        msix_address: 0x0,
+        // device_type: PCI_TYPE_DEVICE,
+        
+        bus: 0,
+        slot: 0x1f,
+        func: 0x0,
+    };
+    let passthrough_pci_unknown = VmPassthroughDeviceConfig::new(
+        PassthroughDeviceType::PCI,
+        Some(pci_unknown),
+        None,
+        None,
+    );
+    passthrough_dev_config_list.add_device_config(passthrough_pci_unknown);
+    // Virtio-9p 00:03:00
+    let capabilities: RwLock<BTreeMap<(u8, u8), CapabilityEnum>> =  RwLock::new(BTreeMap::new());
+    capabilities.write().insert(
+        (0x98, 0x98 + CapabilityMsix::struct_size()), 
+        CapabilityEnum::CapabilityMsix(
+            CapabilityMsix {
+                id: 0x11,
+                next_region: 0x84,
+                message_control: 0x01,
+                table: 0x0,
+                pba: 0x0,
+            }
+        ),
+    );
+    capabilities.write().insert(
+        (0x84, 0x84 + CapabilityDummy::struct_size()), 
+        CapabilityEnum::CapabilityDummy(
+            CapabilityDummy {
+                id: 0x09,
+                next_region: 0x70,
+                control: 0x0,
+                unknown: 0x0,
+            }
+        ),
+    );
+    capabilities.write().insert(
+        (0x70, 0x70 + CapabilityDummy::struct_size()), 
+        CapabilityEnum::CapabilityDummy(
+            CapabilityDummy {
+                id: 0x09,
+                next_region: 0x60,
+                control: 0x0,
+                unknown: 0x0,
+            }
+        ),
+    );
+    capabilities.write().insert(
+        (0x60, 0x60 + CapabilityDummy::struct_size()), 
+        CapabilityEnum::CapabilityDummy(
+            CapabilityDummy {
+                id: 0x09,
+                next_region: 0x50,
+                control: 0x0,
+                unknown: 0x0,
+            }
+        ),
+    );
+    capabilities.write().insert(
+        (0x50, 0x50 + CapabilityDummy::struct_size()), 
+        CapabilityEnum::CapabilityDummy(
+            CapabilityDummy {
+                id: 0x09,
+                next_region: 0x40,
+                control: 0x0,
+                unknown: 0x0,
+            }
+        ),
+    );
+    capabilities.write().insert(
+        (0x40, 0x40 + CapabilityDummy::struct_size()), 
+        CapabilityEnum::CapabilityDummy(
+            CapabilityDummy {
+                id: 0x09,
+                next_region: 0x0,
+                control: 0x0,
+                unknown: 0x0,
+            }
+        ),
+    );
+    let pci_virtio = PCIDevice {
+        vendor_id: 0x1af4,  
+        device_id: 0x1001,
+        command: 0x107,
+        status: 0x10,
+        revision_id_class_code: [0x1, 0, 0, 0x1],
+        cacheline_size: 0x0,
+        latency_timer: 0x0,
+        header_type: 0x0,
+        bist: 0x0,
+        bar: [0xc001, 0xfebd5000, 0x0, 0x0, 0xfe00000c, 0x0],
+        cardbus_cis_pointer: 0x0,
+        subsystem_vendor_id: 0x1af4,
+        subsystem_id: 0x2,
+        expansion_rom_base_address: 0x0,
+        capabilities_pointer: 0x98,
+        _reserved1: 0x0,
+        _reserved2: 0x0,
+        interrupt_line: 0xb,
+        interrupt_pin: 0x1,
+        min_gnt: 0x0,
+        max_lat: 0x0,
+        capabilities: Arc::new(capabilities),
+        
+        bar_size: [0xffffff81, 0xfffff000, 0x0, 0x0, 0xffffc00c, 0xffffc000],
+        expansion_rom_base_address_size: 0x0,
+        num_msix_vectors: 2,
+        msix_region_size: 0x1000,
+        msix_address: 0xfebda000,
+        // device_type: PCI_TYPE_DEVICE,
+        
+        bus: 0,
+        slot: 0x3,
+        func: 0x0,
+    };
+    pci_virtio.find_capability(0x98);
     let passthrough_pci_virtio = VmPassthroughDeviceConfig::new(
         PassthroughDeviceType::PCI,
         Some(pci_virtio),
@@ -374,6 +726,7 @@ pub fn create_default_vm_config_entry() -> VmConfigEntry {
         None,
     );
     passthrough_dev_config_list.add_device_config(passthrough_pci_virtio);
+
     // create vm config entry
     VmConfigEntry{
         id: id,

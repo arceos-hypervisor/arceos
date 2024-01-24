@@ -8,6 +8,7 @@ mod pcip;
 mod pit;
 mod port_passthrough;
 mod uart16550;
+pub mod pci_dev;
 
 extern crate alloc;
 use alloc::{sync::Arc, vec, vec::Vec};
