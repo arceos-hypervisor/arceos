@@ -26,7 +26,7 @@ pub use config_entry::VmConfigEntry;
 pub use emulated_dev_config::{VmEmulatedDeviceConfig, VmEmulatedDeviceConfigList, EmuDeviceType, DeviceType};
 pub use pci_dev::{
     PCIDevice, CapabilityEnum,
-    CapabilityDummy, CapabilityMsix, CapabilityMsi,
+    CapabilityDummy, CapabilityMsix, CapabilityMsi, CapabilityPcie, Capability9,
 };
 pub use passthrough_dev_config::{
     VmPassthroughDeviceConfig, VmPassthroughDeviceConfigList, 
@@ -467,8 +467,8 @@ pub fn create_default_vm_config_entry() -> VmConfigEntry {
             CapabilityDummy {
                 id: 0x01,
                 next_region: 0xd0,
-                control: 0x0,
-                unknown: 0x0,
+                unknown1: [0x0, 0x0],
+                unknown2: [0x0, 0x0, 0x0, 0x0],
             }
         ),
     );
@@ -480,17 +480,20 @@ pub fn create_default_vm_config_entry() -> VmConfigEntry {
                 next_region: 0xe0,
                 message_control: 0x80,
                 message_address: 0x0,
+                message_upper_address: 0x0,
+                message_data: 0x0,
             }
         ),
     );
     capabilities.write().insert(
         (0xe0, 0xe0 + CapabilityDummy::struct_size()), 
-        CapabilityEnum::CapabilityDummy(
-            CapabilityDummy {
+        CapabilityEnum::CapabilityPcie(
+            CapabilityPcie {
                 id: 0x10,
                 next_region: 0xa0,
                 control: 0x91,
-                unknown: 0x8000,
+                unknown1: 0x8000,
+                unknown2: 0x0,
             }
         ),
     );
@@ -550,28 +553,6 @@ pub fn create_default_vm_config_entry() -> VmConfigEntry {
     passthrough_dev_config_list.add_device_config(passthrough_pci_unknown);
     // unknown: 00:1f:00
     let capabilities:RwLock<BTreeMap<(u8, u8), CapabilityEnum>> = RwLock::new(BTreeMap::new());
-    capabilities.write().insert(
-        (0x80, 0x80 + CapabilityMsi::struct_size()), 
-        CapabilityEnum::CapabilityMsi(
-            CapabilityMsi {
-                id: 0x05,
-                next_region: 0xa8,
-                message_control: 0x80,
-                message_address: 0x0,
-            }
-        ),
-    );
-    capabilities.write().insert(
-        (0xa8, 0xa8 + CapabilityDummy::struct_size()), 
-        CapabilityEnum::CapabilityDummy(
-            CapabilityDummy {
-                id: 0x12,
-                next_region: 0x0,
-                control: 0x0,
-                unknown: 0x0,
-            }
-        ),
-    );
     let pci_unknown = PCIDevice {
         vendor_id: 0x8086,  
         device_id: 0x2918,
@@ -614,6 +595,118 @@ pub fn create_default_vm_config_entry() -> VmConfigEntry {
         None,
     );
     passthrough_dev_config_list.add_device_config(passthrough_pci_unknown);
+    // unknown: 00:1f:02
+    let capabilities:RwLock<BTreeMap<(u8, u8), CapabilityEnum>> = RwLock::new(BTreeMap::new());
+    capabilities.write().insert(
+        (0x80, 0x80 + CapabilityMsi::struct_size()), 
+        CapabilityEnum::CapabilityMsi(
+            CapabilityMsi {
+                id: 0x05,
+                next_region: 0xa8,
+                message_control: 0x80,
+                message_address: 0xfee01004,
+                message_upper_address: 0x0,
+                message_data: 0x0,
+            }
+        ),
+    );
+    capabilities.write().insert(
+        (0xa8, 0xa8 + CapabilityDummy::struct_size()), 
+        CapabilityEnum::CapabilityDummy(
+            CapabilityDummy {
+                id: 0x12,
+                next_region: 0x0,
+                unknown1: [0x0, 0x0],
+                unknown2: [0x0, 0x0, 0x0, 0x0],
+            }
+        ),
+    );
+    let pci_unknown = PCIDevice {
+        vendor_id: 0x8086,  
+        device_id: 0x2922,
+        command: 0x107,
+        status: 0x10,
+        revision_id_class_code: [0x2, 0x1, 0x6, 0x1],
+        cacheline_size: 0x0,
+        latency_timer: 0x0,
+        header_type: 0x80,
+        bist: 0x0,
+        bar: [0x0, 0x0, 0x0, 0x0, 0xc0e1, 0xfebd6000],
+        cardbus_cis_pointer: 0x0,
+        subsystem_vendor_id: 0x1af4,
+        subsystem_id: 0x1100,
+        expansion_rom_base_address: 0x0,
+        capabilities_pointer: 0x80,
+        _reserved1: 0x0,
+        _reserved2: 0x0,
+        interrupt_line: 0xa,
+        interrupt_pin: 0x1,
+        min_gnt: 0x0,
+        max_lat: 0x0,
+        capabilities: Arc::new(capabilities),
+        
+        bar_size: [0x0, 0x0, 0x0, 0x0, 0xffffffe1, 0xfffff000],
+        expansion_rom_base_address_size: 0x0,
+        num_msix_vectors: 0,
+        msix_region_size: 0x0,
+        msix_address: 0x0,
+        // device_type: PCI_TYPE_DEVICE,
+        
+        bus: 0,
+        slot: 0x1f,
+        func: 0x2,
+    };
+    let passthrough_pci_unknown = VmPassthroughDeviceConfig::new(
+        PassthroughDeviceType::PCI,
+        Some(pci_unknown),
+        None,
+        None,
+    );
+    passthrough_dev_config_list.add_device_config(passthrough_pci_unknown);
+    // unknown: 00:1f:03
+    let capabilities:RwLock<BTreeMap<(u8, u8), CapabilityEnum>> = RwLock::new(BTreeMap::new());
+    let pci_unknown = PCIDevice {
+        vendor_id: 0x8086,  
+        device_id: 0x2930,
+        command: 0x103,
+        status: 0x0,
+        revision_id_class_code: [0x2, 0, 0x5, 0xc],
+        cacheline_size: 0x0,
+        latency_timer: 0x0,
+        header_type: 0x80,
+        bist: 0x0,
+        bar: [0x0, 0x0, 0x0, 0x0, 0x701, 0x0],
+        cardbus_cis_pointer: 0x0,
+        subsystem_vendor_id: 0x1af4,
+        subsystem_id: 0x1100,
+        expansion_rom_base_address: 0x0,
+        capabilities_pointer: 0x0,
+        _reserved1: 0x0,
+        _reserved2: 0x0,
+        interrupt_line: 0x1,
+        interrupt_pin: 0xa,
+        min_gnt: 0x0,
+        max_lat: 0x0,
+        capabilities: Arc::new(capabilities),
+        
+        bar_size: [0x0, 0x0, 0x0, 0x0, 0xffffffc1, 0x0],
+        expansion_rom_base_address_size: 0x0,
+        num_msix_vectors: 0,
+        msix_region_size: 0x0,
+        msix_address: 0x0,
+        // device_type: PCI_TYPE_DEVICE,
+        
+        bus: 0,
+        slot: 0x1f,
+        func: 0x3,
+    };
+    let passthrough_pci_unknown = VmPassthroughDeviceConfig::new(
+        PassthroughDeviceType::PCI,
+        Some(pci_unknown),
+        None,
+        None,
+    );
+    passthrough_dev_config_list.add_device_config(passthrough_pci_unknown);
     // Virtio-9p 00:03:00
     let capabilities: RwLock<BTreeMap<(u8, u8), CapabilityEnum>> =  RwLock::new(BTreeMap::new());
     capabilities.write().insert(
@@ -623,63 +716,73 @@ pub fn create_default_vm_config_entry() -> VmConfigEntry {
                 id: 0x11,
                 next_region: 0x84,
                 message_control: 0x01,
-                table: 0x0,
+                table: 0x1,
                 pba: 0x0,
             }
         ),
     );
     capabilities.write().insert(
-        (0x84, 0x84 + CapabilityDummy::struct_size()), 
-        CapabilityEnum::CapabilityDummy(
-            CapabilityDummy {
+        (0x84, 0x84 + Capability9::struct_size()), 
+        CapabilityEnum::Capability9(
+            Capability9 {
                 id: 0x09,
                 next_region: 0x70,
-                control: 0x0,
-                unknown: 0x0,
+                unknown1: [0x0, 0x5],
+                unknown2: [0x0, 0x0, 0x0, 0x0],
+                unknown3: 0x0,
+                unknown4: 0x0,
             }
         ),
     );
     capabilities.write().insert(
-        (0x70, 0x70 + CapabilityDummy::struct_size()), 
-        CapabilityEnum::CapabilityDummy(
-            CapabilityDummy {
+        (0x70, 0x70 + Capability9::struct_size()), 
+        CapabilityEnum::Capability9(
+            Capability9 {
                 id: 0x09,
                 next_region: 0x60,
-                control: 0x0,
-                unknown: 0x0,
+                unknown1: [0x0, 0x2],
+                unknown2: [0x4, 0x0, 0x0, 0x0],
+                unknown3: 0x3000,
+                unknown4: 0x1000,
             }
         ),
     );
     capabilities.write().insert(
-        (0x60, 0x60 + CapabilityDummy::struct_size()), 
-        CapabilityEnum::CapabilityDummy(
-            CapabilityDummy {
+        (0x60, 0x60 + Capability9::struct_size()), 
+        CapabilityEnum::Capability9(
+            Capability9 {
                 id: 0x09,
                 next_region: 0x50,
-                control: 0x0,
-                unknown: 0x0,
+                unknown1: [0x0, 0x4],
+                unknown2: [0x4, 0x0, 0x0, 0x0],
+                unknown3: 0x2000,
+                unknown4: 0x1000,
             }
         ),
     );
     capabilities.write().insert(
-        (0x50, 0x50 + CapabilityDummy::struct_size()), 
-        CapabilityEnum::CapabilityDummy(
-            CapabilityDummy {
+        (0x50, 0x50 + Capability9::struct_size()), 
+        CapabilityEnum::Capability9(
+            Capability9 {
                 id: 0x09,
                 next_region: 0x40,
-                control: 0x0,
-                unknown: 0x0,
+                unknown1: [0x0, 0x3],
+                unknown2: [0x4, 0x0, 0x0, 0x0],
+                unknown3: 0x1000,
+                unknown4: 0x1000,
             }
         ),
     );
     capabilities.write().insert(
-        (0x40, 0x40 + CapabilityDummy::struct_size()), 
-        CapabilityEnum::CapabilityDummy(
-            CapabilityDummy {
+        (0x40, 0x40 + Capability9::struct_size()), 
+        CapabilityEnum::Capability9(
+            Capability9 {
                 id: 0x09,
                 next_region: 0x0,
-                control: 0x0,
-                unknown: 0x0,
+                unknown1: [0x0, 0x1],
+                unknown2: [0x4, 0x0, 0x0, 0x0],
+                unknown3: 0x0,
+                unknown4: 0x1000,
             }
         ),
     );
@@ -688,7 +791,7 @@ pub fn create_default_vm_config_entry() -> VmConfigEntry {
         device_id: 0x1001,
         command: 0x107,
         status: 0x10,
-        revision_id_class_code: [0x1, 0, 0, 0x1],
+        revision_id_class_code: [0x0, 0, 0, 0x1],
         cacheline_size: 0x0,
         latency_timer: 0x0,
         header_type: 0x0,
@@ -707,7 +810,7 @@ pub fn create_default_vm_config_entry() -> VmConfigEntry {
         max_lat: 0x0,
         capabilities: Arc::new(capabilities),
         
-        bar_size: [0xffffff81, 0xfffff000, 0x0, 0x0, 0xffffc00c, 0xffffc000],
+        bar_size: [0xffffff81, 0xfffff000, 0x0, 0x0, 0xffffc00c, 0xffffffff],
         expansion_rom_base_address_size: 0x0,
         num_msix_vectors: 2,
         msix_region_size: 0x1000,

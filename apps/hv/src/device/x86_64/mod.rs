@@ -201,8 +201,8 @@ impl<H: HyperCraftHal> PerCpuDevices<H> for X64VcpuDevices<H> {
                     }
                 },
                 EmuDeviceType::EmuDevicePCI => {
-                    // let pci_config_space = device_emu::PCIConfigurationSpace::new(emu_dev.base[0] as _, emu_dev.range[0] as _);
-                    let pci_config_space = device_emu::PCIPassthrough::new(emu_dev.base[0] as _);
+                    let pci_config_space = device_emu::PCIConfigurationSpace::new(emu_dev.base[0] as _, emu_dev.range[0] as _);
+                    // let pci_config_space = device_emu::PCIPassthrough::new(emu_dev.base[0] as _);
                     devices.add_port_io_device(Arc::new(Mutex::new(pci_config_space)));
                 },
                 EmuDeviceType::EmuDeviceDebugPort => {

@@ -32,6 +32,7 @@ const CONFIGURATION_SPACE_DATA_PORT_LAST_OFFSET: usize = 7;
 
 const PCI_CONFIG_BASE: u16 = 0xcf8;
 const PCI_DATA_BASE: u16 = 0xcfc;
+const PCI_CONFIG_HEADER_END: usize = 0x40;
 
 const BAR_WRITE_MASK0: u32 = !0x7ff;
 const BAR_WRITE_MASK1: u32 = !0;
@@ -75,9 +76,9 @@ impl PortIoDevice for PCIConfigurationSpace {
                             // config space offset  according to arch/x86/pci/direct.c and early.c
                             offset = ((value as u16 & OFFSET_MASK) + ((port - PCI_DATA_BASE) & 0b11)) as usize;
                             // capabilitiy list
-                            if offset>0x40 {
+                            if offset>=PCI_CONFIG_HEADER_END {
                                 if let Some(capability) = pci_device.find_capability(offset as u8) {
-                                    let capability_start = pci_device.find_capability_start(offset as u8) as usize;
+                                    let capability_start = pci_device.find_capability_range(offset as u8).0 as usize;
                                     let capability_offset = offset - capability_start;
                                     info!("[read capability] this is read pci port:{:#x} offset:{:#x} base start:{:#x}", port, capability_offset, capability_start);
                                     read_value = read_u8(&capability, capability_offset) as u32;
@@ -92,9 +93,9 @@ impl PortIoDevice for PCIConfigurationSpace {
                         2 => {
                             // config space offset  according to arch/x86/pci/direct.c and early.c
                             offset = ((value as u16 & OFFSET_MASK) + ((port - PCI_DATA_BASE) & 0b10)) as usize;
-                            if offset>0x40 {
+                            if offset>=PCI_CONFIG_HEADER_END {
                                 if let Some(capability) = pci_device.find_capability(offset as u8) {
-                                    let capability_start = pci_device.find_capability_start(offset as u8) as usize;
+                                    let capability_start = pci_device.find_capability_range(offset as u8).0 as usize;
                                     let capability_offset = offset - capability_start;
                                     info!("[read capability] this is read pci port:{:#x} offset:{:#x} base start:{:#x}", port, capability_offset, capability_start);
                                     read_value = read_u16(&capability, capability_offset) as u32;
@@ -110,9 +111,9 @@ impl PortIoDevice for PCIConfigurationSpace {
                             // config space offset  according to arch/x86/pci/direct.c and early.c
                             offset = (value as u16 & OFFSET_MASK) as usize;
                             // capabilitiy list
-                            if offset>0x40 {
+                            if offset>=PCI_CONFIG_HEADER_END {
                                 if let Some(capability) = pci_device.find_capability(offset as u8) {
-                                    let capability_start = pci_device.find_capability_start(offset as u8) as usize;
+                                    let capability_start = pci_device.find_capability_range(offset as u8).0 as usize;
                                     let capability_offset = offset - capability_start;
                                     info!("[read capability] this is read pci port:{:#x} offset:{:#x} base start:{:#x}", port, capability_offset, capability_start);
                                     read_value = read_u32(&capability, capability_offset);
@@ -189,20 +190,57 @@ impl PortIoDevice for PCIConfigurationSpace {
                         1 => {
                             // config space offset  according to arch/x86/pci/direct.c and early.c
                             offset = ((value as u16 & OFFSET_MASK) + ((port - PCI_DATA_BASE) & 0b11)) as usize;
-                            write_u8(pci_device, offset as usize, write_value as u8);
+                            // capabilitiy list
+                            if offset>=PCI_CONFIG_HEADER_END {
+                                if let Some(mut capability) = pci_device.find_capability(offset as u8) {
+                                    let (start, end) = pci_device.find_capability_range(offset as u8);
+                                    let capability_offset = offset - start as usize;
+                                    info!("[write data] pci port:{:#x} access_size:{:#x} offset:{:#x} capability_start:{:#x} write_value: {:#x}", port, access_size, offset, start, write_value);
+                                    write_u8(&mut capability, capability_offset, write_value as u8);
+                                    pci_device.update_capability_map(start, end, capability)
+                                }else {
+                                    warn!("[read capability] {:#x} not found", offset);
+                                }
+                            }else {
+                                write_u8(pci_device, offset as usize, write_value as u8);
+                            }
                         }
                         2 => {
                             // config space offset  according to arch/x86/pci/direct.c and early.c
                             offset = ((value as u16 & OFFSET_MASK) + ((port - PCI_DATA_BASE) & 0b10)) as usize;
-                            info!("[write data] pci port:{:#x} access_size:{:#x} offset:{:#x} read_value: {:#x}", port, access_size, offset, write_value);
-                            write_u16(pci_device, offset as usize, write_value as u16);
+                            
+                            // capabilitiy list
+                            if offset>=PCI_CONFIG_HEADER_END {
+                                if let Some(mut capability) = pci_device.find_capability(offset as u8) {
+                                    let (start, end) = pci_device.find_capability_range(offset as u8);
+                                    let capability_offset = offset - start as usize;
+                                    info!("[write data] pci port:{:#x} access_size:{:#x} offset:{:#x} capability_start:{:#x} write_value: {:#x}", port, access_size, offset, start, write_value);
+                                    write_u16(&mut capability, capability_offset, write_value as u16);
+                                    pci_device.update_capability_map(start, end, capability)
+                                }else {
+                                    warn!("[read capability] {:#x} not found", offset);
+                                }
+                            }else {
+                                write_u16(pci_device, offset as usize, write_value as u16);
+                            }
                         }
                         4 => {
                             // config space offset  according to arch/x86/pci/direct.c and early.c
                             offset = (value as u16 & OFFSET_MASK) as usize;
                             info!("[write data] pci port:{:#x} access_size:{:#x} offset:{:#x} read_value: {:#x}", port, access_size, offset, write_value);
+                            if offset >= PCI_CONFIG_HEADER_END {
+                                if let Some(mut capability) = pci_device.find_capability(offset as u8) {
+                                    let (start, end) = pci_device.find_capability_range(offset as u8);
+                                    let capability_offset = offset - start as usize;
+                                    info!("[write data] pci port:{:#x} access_size:{:#x} offset:{:#x} capability_start:{:#x} write_value: {:#x}", port, access_size, offset, start, write_value);
+                                    write_u32(&mut capability, capability_offset, write_value as u32);
+                                    pci_device.update_capability_map(start, end, capability)
+                                }else {
+                                    warn!("[read capability] {:#x} not found", offset);
+                                }
+                            }
                             // update bar address to size???
-                            if (write_value==BAR_WRITE_MASK0 || write_value==BAR_WRITE_MASK1) 
+                            else if (write_value==BAR_WRITE_MASK0 || write_value==BAR_WRITE_MASK1) 
                             && (0x10..=0x24).contains(&offset) {
                                 let index = (offset - 0x10) / 4;
                                 write_u32(pci_device, offset as usize, pci_device.bar_size[index]);

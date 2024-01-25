@@ -98,34 +98,32 @@ impl ReadWriteStruct for PCIDevice {
 }
 
 impl PCIDevice {
-    // readonly fields???
+    // readonly
     pub fn find_capability(&self, value: u8) -> Option<CapabilityEnum> {
-        if value==0x98 {
-            info!("[find_capability]1111111111111111111");
-        }
         let range_map = self.capabilities.read();
-        if value==0x98 {
-            info!("[find_capability]22222222222222222");
-        }
         for ((start, end), capability) in range_map.iter() {
-            if self.bus==0x0 && self.slot==0x3 && self.func==0x0 {
-                info!("[find_capability] start:{:#x} end:{:#x} capability:{:?}", start, end, capability);
-            }
             if *start <= value && value < *end {
-                return Some(*capability);
+                return Some(capability.clone());
             }
         }
         None
     }
+
+    // after write the field of capability, call this func to update the capability map
+    pub fn update_capability_map(&mut self, start: u8, end: u8, capability: CapabilityEnum) {
+        let mut range_map = self.capabilities.write();
+        range_map.insert((start, end), capability);
+    }
+
     // suppose the capability exists when call this func
-    pub fn find_capability_start(&self, offset: u8) -> u8 {
+    pub fn find_capability_range(&self, offset: u8) -> (u8, u8) {
         let range_map = self.capabilities.read();
         for ((start, end), _) in range_map.iter() {
             if *start <= offset && offset < *end {
-                return *start;
+                return (*start, *end);
             }
         }
-        return 0xff;
+        return (0xff, 0xff);
     }
     
 }
@@ -134,6 +132,8 @@ impl PCIDevice {
 pub enum CapabilityEnum {
     CapabilityMsix(CapabilityMsix),
     CapabilityMsi(CapabilityMsi),
+    CapabilityPcie(CapabilityPcie),
+    Capability9(Capability9),
     CapabilityDummy(CapabilityDummy),
 }
 
@@ -143,6 +143,8 @@ impl ReadWriteStruct for CapabilityEnum {
             CapabilityEnum::CapabilityMsix(cap) => cap.read_bytes(start, count),
             CapabilityEnum::CapabilityMsi(cap) => cap.read_bytes(start, count),
             CapabilityEnum::CapabilityDummy(cap) => cap.read_bytes(start, count),
+            CapabilityEnum::CapabilityPcie(cap) => cap.read_bytes(start, count),
+            CapabilityEnum::Capability9(cap) => cap.read_bytes(start, count),
         }
     }
 
@@ -151,6 +153,8 @@ impl ReadWriteStruct for CapabilityEnum {
             CapabilityEnum::CapabilityMsix(cap) => cap.write_bytes(start, bytes),
             CapabilityEnum::CapabilityMsi(cap) => cap.write_bytes(start, bytes),
             CapabilityEnum::CapabilityDummy(cap) => cap.write_bytes(start, bytes),
+            CapabilityEnum::CapabilityPcie(cap) => cap.write_bytes(start, bytes),
+            CapabilityEnum::Capability9(cap) => cap.write_bytes(start, bytes),
         }
     }
 
@@ -195,6 +199,8 @@ pub struct CapabilityMsi {
     pub next_region: u8,  // 0x1 byte address in the config space
     pub message_control: u16,   // 0x2
     pub message_address: u32, // 0x4
+    pub message_upper_address: u32, // 0x8
+    pub message_data: u16, // 0xc
     // pub pba: u32,   // 0x8
 }
 
@@ -216,13 +222,45 @@ impl ReadWriteStruct for CapabilityMsi {
     }
 }
 
+
+#[derive(Clone, Debug, Copy, serde::Deserialize)]
+#[repr(C)]
+pub struct CapabilityPcie {
+    pub id: u8,     // 0x0
+    pub next_region: u8,  // 0x1 byte address in the config space
+    pub control: u16,   // 0x2  maybe this is control
+    pub unknown1: u32, // 0x4
+    pub unknown2: u32, // 0x8
+    // TODO: do not know what the struct is
+}
+
+impl ReadWriteStruct for CapabilityPcie {
+    fn read_bytes(&self, start: usize, count: usize) -> &[u8] {
+        assert!(start + count <= CapabilityPcie::struct_size() as usize);
+        let device_ptr = self as *const _ as *const u8;
+        let slice = unsafe { slice::from_raw_parts(device_ptr.add(start), count) };
+        slice
+    }
+
+    fn write_bytes(&mut self, start: usize, bytes: &[u8]) {
+        assert!(start + bytes.len() <= CapabilityPcie::struct_size() as usize);
+        let device_ptr = self as *mut _ as *mut u8;
+        let slice = unsafe { slice::from_raw_parts_mut(device_ptr.add(start), bytes.len()) };
+        slice.copy_from_slice(bytes);
+    }
+    fn struct_size() -> u8 {
+        mem::size_of::<Self>() as u8
+    }
+}
+
+
 #[derive(Clone, Debug, Copy, serde::Deserialize)]
 #[repr(C)]
 pub struct CapabilityDummy {
     pub id: u8,     // 0x0
     pub next_region: u8,  // 0x1 byte address in the config space
-    pub control: u16,   // 0x2  maybe this is control
-    pub unknown: u32, // 0x4
+    pub unknown1: [u8; 2],  // 0x2, 0x3
+    pub unknown2: [u8; 4],  // 0x4~0x7
     // TODO: do not know what the struct is
 }
 
@@ -236,6 +274,37 @@ impl ReadWriteStruct for CapabilityDummy {
 
     fn write_bytes(&mut self, start: usize, bytes: &[u8]) {
         assert!(start + bytes.len() <= CapabilityDummy::struct_size() as usize);
+        let device_ptr = self as *mut _ as *mut u8;
+        let slice = unsafe { slice::from_raw_parts_mut(device_ptr.add(start), bytes.len()) };
+        slice.copy_from_slice(bytes);
+    }
+    fn struct_size() -> u8 {
+        mem::size_of::<Self>() as u8
+    }
+}
+
+#[derive(Clone, Debug, Copy, serde::Deserialize)]
+#[repr(C)]
+pub struct Capability9 {
+    pub id: u8,     // 0x0
+    pub next_region: u8,  // 0x1 byte address in the config space
+    pub unknown1: [u8; 2],  // 0x2, 0x3
+    pub unknown2: [u8; 4],  // 0x4~0x7
+    pub unknown3: u32,  //0x8
+    pub unknown4: u32, // 0xc
+    // TODO: do not know what the struct is
+}
+
+impl ReadWriteStruct for Capability9 {
+    fn read_bytes(&self, start: usize, count: usize) -> &[u8] {
+        assert!(start + count <= Capability9::struct_size() as usize);
+        let device_ptr = self as *const _ as *const u8;
+        let slice = unsafe { slice::from_raw_parts(device_ptr.add(start), count) };
+        slice
+    }
+
+    fn write_bytes(&mut self, start: usize, bytes: &[u8]) {
+        assert!(start + bytes.len() <= Capability9::struct_size() as usize);
         let device_ptr = self as *mut _ as *mut u8;
         let slice = unsafe { slice::from_raw_parts_mut(device_ptr.add(start), bytes.len()) };
         slice.copy_from_slice(bytes);
