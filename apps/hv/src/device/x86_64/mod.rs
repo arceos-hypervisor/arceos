@@ -382,6 +382,10 @@ impl<H: HyperCraftHal> PerCpuDevices<H> for X64VcpuDevices<H> {
         }
     }
 
+    fn hypercall_handler(&mut self, vcpu: &mut VCpu<H>, id: u32, args: (u32, u32)) -> HyperResult<u32> {
+        Err(HyperError::NotSupported)
+    }
+
     fn check_events(&mut self, vcpu: &mut VCpu<H>) -> HyperResult {
         if self.apic_timer.lock().inner.check_interrupt() {
             vcpu.queue_event(self.apic_timer.lock().inner.vector(), None);

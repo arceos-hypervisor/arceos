@@ -59,7 +59,7 @@ void cpy4(void *dst, const void *src, uint32_t size) {
 }
 
 
-const char cmd[256] = "root=/dev/vda rw console=uart8250,io,0x3f8,115200n8 debug\0";
+const char cmd[256] = "console=uart8250,io,0x3f8,115200n8 debug\0";
 // const char cmd[256] = "console=uart8250,io,0x3f8,115200n8 debug\0";
 
 /*

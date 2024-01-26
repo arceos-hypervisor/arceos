@@ -1,5 +1,4 @@
 [submodule "crates/hypercraft"]
 	path = crates/hypercraft
-	url = https://github.com/915604903T/hypercraft
-[submodule "crates/hypercraft/"]
-	url = https://github.com/915604903T/hypercraft
+	url = https://github.com/arceos-hypervisor/hypercraft.git
+	branch = x86
