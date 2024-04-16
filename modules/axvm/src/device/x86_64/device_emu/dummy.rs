@@ -1,4 +1,4 @@
-use super::PortIoDevice;
+use crate::device::PioOps;
 
 use crate::Result as HyperResult;
 
@@ -16,7 +16,7 @@ impl Dummy {
     }
 }
 
-impl PortIoDevice for Dummy {
+impl PioOps for Dummy {
     fn port_range(&self) -> core::ops::Range<u16> {
         self.port_base..self.port_base + self.port_count
     }
@@ -25,7 +25,7 @@ impl PortIoDevice for Dummy {
         Ok(0)
     }
 
-    fn write(&mut self, _port: u16, _access_size: u8, _value: u32) -> HyperResult {
+    fn write(&mut self, _port: u16, _access_size: u8, _value: &[u8]) -> HyperResult {
         Ok(())
     }
 }

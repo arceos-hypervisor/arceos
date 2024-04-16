@@ -1,4 +1,4 @@
-use super::PortIoDevice;
+use crate::device::PioOps;
 use crate::Result as HyperResult;
 
 pub struct DebugPort {
@@ -11,7 +11,7 @@ impl DebugPort {
     }
 }
 
-impl PortIoDevice for DebugPort {
+impl PioOps for DebugPort {
     fn port_range(&self) -> core::ops::Range<u16> {
         self.port..self.port + 1
     }
@@ -21,7 +21,7 @@ impl PortIoDevice for DebugPort {
         Ok(0)
     }
 
-    fn write(&mut self, _port: u16, _access_size: u8, _value: u32) -> HyperResult {
+    fn write(&mut self, _port: u16, _access_size: u8, _value: &[u8]) -> HyperResult {
         // debug!("a byte written to debug port {:#x}: {:#4x}", port, value as u8);
         Ok(())
     }

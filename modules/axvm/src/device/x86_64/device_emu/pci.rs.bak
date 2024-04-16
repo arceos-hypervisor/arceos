@@ -1,5 +1,4 @@
-use super::PortIoDevice;
-use crate::{Error as HyperError, Result as HyperResult};
+use super::PioOps;
 use bit_field::BitField;
 
 pub struct PCIConfigurationSpace {
@@ -21,7 +20,7 @@ impl PCIConfigurationSpace {
     }
 }
 
-impl PortIoDevice for PCIConfigurationSpace {
+impl PioOps for PCIConfigurationSpace {
     fn port_range(&self) -> core::ops::Range<u16> {
         return self.port_base..self.port_base + 8;
     }

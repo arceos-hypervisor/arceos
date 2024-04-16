@@ -5,7 +5,8 @@ use crate::{Error as HyperError, Result as HyperResult};
 use axhal::time::current_time_nanos;
 use bit_field::BitField;
 
-use super::{msr_proxy_factory, msr_proxy_struct, VirtMsrDevice};
+use super::{msr_proxy_struct, msr_proxy_factory};
+use crate::device::VirtMsrOps;
 
 const APIC_FREQ_MHZ: u64 = 1000; // 1000 MHz
 const APIC_CYCLE_NANOS: u64 = 1000 / APIC_FREQ_MHZ;
@@ -314,7 +315,7 @@ impl ApicBaseMsrHandler {
     }
 }
 
-impl VirtMsrDevice for ApicBaseMsrHandler {
+impl VirtMsrOps for ApicBaseMsrHandler {
     fn msr_range(&self) -> core::ops::Range<u32> {
         x86::msr::IA32_APIC_BASE..(x86::msr::IA32_APIC_BASE + 1)
     }

@@ -12,15 +12,16 @@ use bit_field::BitField;
 use core::marker::PhantomData;
 use spin::Mutex;
 
-use device_emu::{ApicBaseMsrHandler, Bundle, PortIoDevice, VirtLocalApic, VirtMsrDevice};
+use device_emu::{ApicBaseMsrHandler, Bundle, VirtLocalApic};
+use crate::device::{PioOps, VirtMsrOps};
 
 const VM_EXIT_INSTR_LEN_RDMSR: u8 = 2;
 const VM_EXIT_INSTR_LEN_WRMSR: u8 = 2;
 const VM_EXIT_INSTR_LEN_VMCALL: u8 = 3;
 
 pub struct DeviceList<H: HyperCraftHal> {
-    port_io_devices: Vec<Arc<Mutex<dyn PortIoDevice>>>,
-    msr_devices: Vec<Arc<Mutex<dyn VirtMsrDevice>>>,
+    port_io_devices: Vec<Arc<Mutex<dyn PioOps>>>,
+    msr_devices: Vec<Arc<Mutex<dyn VirtMsrOps>>>,
     marker: core::marker::PhantomData<H>,
 }
 
@@ -33,29 +34,29 @@ impl<H: HyperCraftHal> DeviceList<H> {
         }
     }
 
-    pub fn add_port_io_device(&mut self, device: Arc<Mutex<dyn PortIoDevice>>) {
+    pub fn add_port_io_device(&mut self, device: Arc<Mutex<dyn PioOps>>) {
         self.port_io_devices.push(device)
     }
 
-    pub fn add_port_io_devices(&mut self, devices: &mut Vec<Arc<Mutex<dyn PortIoDevice>>>) {
+    pub fn add_port_io_devices(&mut self, devices: &mut Vec<Arc<Mutex<dyn PioOps>>>) {
         self.port_io_devices.append(devices)
     }
 
-    pub fn find_port_io_device(&self, port: u16) -> Option<&Arc<Mutex<dyn PortIoDevice>>> {
+    pub fn find_port_io_device(&self, port: u16) -> Option<&Arc<Mutex<dyn PioOps>>> {
         self.port_io_devices
             .iter()
             .find(|dev| dev.lock().port_range().contains(&port))
     }
 
-    pub fn add_msr_device(&mut self, device: Arc<Mutex<dyn VirtMsrDevice>>) {
+    pub fn add_msr_device(&mut self, device: Arc<Mutex<dyn VirtMsrOps>>) {
         self.msr_devices.push(device)
     }
 
-    pub fn add_msr_devices(&mut self, devices: &mut Vec<Arc<Mutex<dyn VirtMsrDevice>>>) {
+    pub fn add_msr_devices(&mut self, devices: &mut Vec<Arc<Mutex<dyn VirtMsrOps>>>) {
         self.msr_devices.append(devices)
     }
 
-    pub fn find_msr_device(&self, msr: u32) -> Option<&Arc<Mutex<dyn VirtMsrDevice>>> {
+    pub fn find_msr_device(&self, msr: u32) -> Option<&Arc<Mutex<dyn VirtMsrOps>>> {
         self.msr_devices
             .iter()
             .find(|dev| dev.lock().msr_range().contains(&msr))
@@ -64,7 +65,7 @@ impl<H: HyperCraftHal> DeviceList<H> {
     fn handle_io_instruction_to_device(
         vcpu: &mut VCpu<H>,
         exit_info: &VmxExitInfo,
-        device: &Arc<Mutex<dyn PortIoDevice>>,
+        device: &Arc<Mutex<dyn PioOps>>,
     ) -> HyperResult {
         let io_info = vcpu.io_exit_info().unwrap();
         trace!(
@@ -99,14 +100,14 @@ impl<H: HyperCraftHal> DeviceList<H> {
         } else {
             let rax = vcpu.regs().rax;
             let value = match io_info.access_size {
-                1 => rax & 0xff,
-                2 => rax & 0xffff,
-                4 => rax,
+                1 => (rax as u8).to_le_bytes(),
+                2 => (rax as u16).to_le_bytes(),
+                4 => (rax as u32).to_le_bytes(),
                 _ => unreachable!(),
-            } as u32;
+            };
             device
                 .lock()
-                .write(io_info.port, io_info.access_size, value)?;
+                .write(io_info.port, io_info.access_size, &value)?;
         }
         vcpu.advance_rip(exit_info.exit_instruction_length as _)?;
         Ok(())
@@ -202,7 +203,7 @@ impl<H: HyperCraftHal> PerCpuDevices<H> for X64VcpuDevices<H> {
 
         let mut devices = DeviceList::new();
 
-        let mut pmio_devices: Vec<Arc<Mutex<dyn PortIoDevice>>> = vec![
+        let mut pmio_devices: Vec<Arc<Mutex<dyn PioOps>>> = vec![
             // console.clone(), // COM1
             Arc::new(Mutex::new(<device_emu::PortPassthrough>::new(0x3f8, 8))),
             Arc::new(Mutex::new(<device_emu::Uart16550>::new(0x2f8))), // COM2

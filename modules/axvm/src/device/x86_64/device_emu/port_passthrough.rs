@@ -1,5 +1,5 @@
-use super::PortIoDevice;
-use crate::{Error as HyperError, Result as HyperResult};
+use super::PioOps;
+use crate::{Result as HyperResult, Error as HyperError};
 use x86::io;
 
 pub struct PortPassthrough {
@@ -13,7 +13,7 @@ impl PortPassthrough {
     }
 }
 
-impl PortIoDevice for PortPassthrough {
+impl PioOps for PortPassthrough {
     fn port_range(&self) -> core::ops::Range<u16> {
         return self.port_base..self.port_base + self.count;
     }
@@ -27,7 +27,7 @@ impl PortIoDevice for PortPassthrough {
         }
     }
 
-    fn write(&mut self, port: u16, access_size: u8, value: u32) -> HyperResult {
+    fn write(&mut self, port: u16, access_size: u8, value: &[u8]) -> HyperResult {
         match access_size {
             1 => Ok(unsafe { io::outb(port, value as u8) }),
             2 => Ok(unsafe { io::outw(port, value as u16) }),

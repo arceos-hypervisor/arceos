@@ -1,9 +1,7 @@
 //! Emulated UART 16550. (ref: https://wiki.osdev.org/Serial_Ports)
-//!
+//! 
+use crate::device::PioOps;
 
-use super::PortIoDevice;
-
-use crate::{Error as HyperError, Result as HyperResult};
 use alloc::string::String;
 use spin::Mutex;
 
@@ -178,7 +176,7 @@ pub struct Uart16550<B: VirtualConsoleBackend = DefaultConsoleBackend> {
     backend: B,
 }
 
-impl<B: VirtualConsoleBackend> PortIoDevice for Uart16550<B> {
+impl<B: VirtualConsoleBackend> PioOps for Uart16550<B> {
     fn port_range(&self) -> core::ops::Range<u16> {
         self.port_base..self.port_base + 8
     }

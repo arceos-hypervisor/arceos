@@ -14,7 +14,9 @@ type1_5 = []
 # third-party deps
 log = "0.4"
 spin = "0.9"
+libc = "0.2"
 bit_field = "0.10"
+byteorder = { version = "1.4.3", default-features = false }
 bitflags = "2.2"
 lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
 fdt = { version = "0.1.5" }
@@ -35,6 +37,7 @@ lazy_init = { path = "../../crates/lazy_init" }
 hypercraft = { path = "../../crates/hypercraft" }
 memory_addr = { path = "../../crates/memory_addr" }
 page_table_entry = { path = "../../crates/page_table_entry", features = ["hv"] }
+pci = { path = "../../crates/pci" }
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
 x86 = "0.52"
