@@ -13,7 +13,7 @@ use core::marker::PhantomData;
 use spin::Mutex;
 
 use device_emu::{ApicBaseMsrHandler, Bundle, VirtLocalApic};
-use crate::device::{PioOps, VirtMsrOps};
+use hypercraft::{PioOps, VirtMsrOps};
 
 const VM_EXIT_INSTR_LEN_RDMSR: u8 = 2;
 const VM_EXIT_INSTR_LEN_WRMSR: u8 = 2;
@@ -100,14 +100,14 @@ impl<H: HyperCraftHal> DeviceList<H> {
         } else {
             let rax = vcpu.regs().rax;
             let value = match io_info.access_size {
-                1 => (rax as u8).to_le_bytes(),
-                2 => (rax as u16).to_le_bytes(),
-                4 => (rax as u32).to_le_bytes(),
+                1 => rax & 0xff,
+                2 => rax & 0xffff,
+                4 => rax,
                 _ => unreachable!(),
-            };
+            } as u32;
             device
                 .lock()
-                .write(io_info.port, io_info.access_size, &value)?;
+                .write(io_info.port, io_info.access_size, value)?;
         }
         vcpu.advance_rip(exit_info.exit_instruction_length as _)?;
         Ok(())
@@ -226,8 +226,8 @@ impl<H: HyperCraftHal> PerCpuDevices<H> for X64VcpuDevices<H> {
             Arc::new(Mutex::new(device_emu::Dummy::new(0x87, 1))),  // 0x87 is a port about dma
             Arc::new(Mutex::new(device_emu::Dummy::new(0x60, 1))), // 0x60 and 0x64 are ports about ps/2 controller
             Arc::new(Mutex::new(device_emu::Dummy::new(0x64, 1))), //
-            Arc::new(Mutex::new(device_emu::PCIConfigurationSpace::new(0xcf8))),
-            // Arc::new(Mutex::new(device_emu::PCIPassthrough::new(0xcf8))),
+                                                                   // Arc::new(Mutex::new(device_emu::PCIConfigurationSpace::new(0xcf8))),
+                                                                   // Arc::new(Mutex::new(device_emu::PCIPassthrough::new(0xcf8))),
         ];
 
         devices.add_port_io_devices(&mut pmio_devices);

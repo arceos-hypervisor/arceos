@@ -1,7 +1,7 @@
 //! Emulated Intel 8259 Programmable Interrupt Controller. (ref: https://wiki.osdev.org/8259_PIC)
 
-use crate::device::PioOps;
 use bit_field::BitField;
+use hypercraft::{HyperError, HyperResult, PioOps};
 
 pub struct I8259Pic {
     port_base: u16,
@@ -27,7 +27,7 @@ impl PioOps for I8259Pic {
         }
     }
 
-    fn write(&mut self, port: u16, _access_size: u8, value: &[u8]) -> HyperResult {
+    fn write(&mut self, port: u16, _access_size: u8, value: u32) -> HyperResult {
         // debug!("writing to pic port {port:#x}: {value:#x}");
 
         let value = value as u8;

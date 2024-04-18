@@ -5,8 +5,8 @@ use crate::{Error as HyperError, Result as HyperResult};
 use axhal::time::current_time_nanos;
 use bit_field::BitField;
 
-use super::{msr_proxy_struct, msr_proxy_factory};
-use crate::device::VirtMsrOps;
+use super::{msr_proxy_factory, msr_proxy_struct};
+use hypercraft::VirtMsrOps;
 
 const APIC_FREQ_MHZ: u64 = 1000; // 1000 MHz
 const APIC_CYCLE_NANOS: u64 = 1000 / APIC_FREQ_MHZ;

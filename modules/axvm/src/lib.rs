@@ -10,6 +10,7 @@
 #![cfg_attr(not(test), no_std)]
 #![feature(doc_cfg)]
 #![feature(doc_auto_cfg)]
+#![feature(exclusive_range_pattern)]
 
 extern crate alloc;
 

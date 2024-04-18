@@ -1,6 +1,6 @@
 //! Emulated UART 16550. (ref: https://wiki.osdev.org/Serial_Ports)
-//! 
-use crate::device::PioOps;
+//!
+use hypercraft::{HyperError, HyperResult, PioOps};
 
 use alloc::string::String;
 use spin::Mutex;

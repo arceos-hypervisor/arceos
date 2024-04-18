@@ -4,9 +4,9 @@
 extern crate log;
 #[macro_use]
 extern crate alloc;
+extern crate hashbrown;
 
 pub mod config;
-pub mod errors;
 pub mod host;
 pub mod msix;
 pub mod util;
@@ -17,21 +17,20 @@ mod bus;
 pub use bus::PciBus;
 pub use config::{PciConfig, INTERRUPT_PIN};
 pub use host::PciHost;
-pub use msix::{init_msix, MsiVector};
-// pub use root_port::RootPort;
+pub use msix::*;
 
-use core::mem::size_of;
-use alloc::sync::{Arc, Weak};
 use alloc::string::String;
+use alloc::sync::{Arc, Weak};
+use core::mem::size_of;
 use spin::Mutex;
 
 use byteorder::{ByteOrder, LittleEndian};
 
 use crate::config::{HEADER_TYPE, HEADER_TYPE_MULTIFUNC, MAX_FUNC};
-use crate::errors::PciResult as Result;
-use crate::util::AsAny;
+pub use crate::util::AsAny;
+use hypercraft::HyperResult as Result;
 
-const BDF_FUNC_SHIFT: u8 = 3;
+// const BDF_FUNC_SHIFT: u8 = 3;
 pub const PCI_SLOT_MAX: u8 = 32;
 pub const PCI_PIN_NUM: u8 = 4;
 pub const PCI_INTR_BASE: u8 = 32;
@@ -51,9 +50,7 @@ macro_rules! le_write {
             if offset + data_len > buf_len {
                 error!(
                     "Out-of-bounds write access: buf_len = {}, offset = {}, data_len = {}",
-                    buf_len,
-                    offset,
-                    data_len
+                    buf_len, offset, data_len
                 );
             }
             LittleEndian::$func(&mut buf[offset..(offset + data_len)], data);
@@ -75,9 +72,7 @@ macro_rules! le_read {
             if offset + data_len > buf_len {
                 error!(
                     "Out-of-bounds read access: buf_len = {}, offset = {}, data_len = {}",
-                    buf_len,
-                    offset,
-                    data_len
+                    buf_len, offset, data_len
                 );
             }
             Ok(LittleEndian::$func(&buf[offset..(offset + data_len)]))
@@ -89,15 +84,15 @@ le_read!(le_read_u16, read_u16, u16);
 le_read!(le_read_u32, read_u32, u32);
 le_read!(le_read_u64, read_u64, u64);
 
-fn le_write_set_value_u16(buf: &mut [u8], offset: usize, data: u16) -> Result<()> {
-    let val = le_read_u16(buf, offset)?;
-    le_write_u16(buf, offset, val | data)
-}
+// fn le_write_set_value_u16(buf: &mut [u8], offset: usize, data: u16) -> Result<()> {
+//     let val = le_read_u16(buf, offset)?;
+//     le_write_u16(buf, offset, val | data)
+// }
 
-fn le_write_clear_value_u16(buf: &mut [u8], offset: usize, data: u16) -> Result<()> {
-    let val = le_read_u16(buf, offset)?;
-    le_write_u16(buf, offset, val & !data)
-}
+// fn le_write_clear_value_u16(buf: &mut [u8], offset: usize, data: u16) -> Result<()> {
+//     let val = le_read_u16(buf, offset)?;
+//     le_write_u16(buf, offset, val & !data)
+// }
 
 fn pci_devfn(slot: u8, func: u8) -> u8 {
     ((slot & 0x1f) << 3) | (func & 0x07)
@@ -260,9 +255,9 @@ pub trait PciDevOps: Send + AsAny {
     //     None
     // }
 
-    // fn get_msi_irq_manager(&self) -> Option<Arc<dyn MsiIrqManager>> {
-    //     None
-    // }
+    fn get_msi_irq_manager(&self) -> Option<Arc<dyn MsiIrqManager>> {
+        None
+    }
 }
 
 /// Init multifunction for pci devices.
@@ -325,12 +320,15 @@ pub fn init_multifunction(
         if locked_bus.devices.get(&pci_devfn(slot, func)).is_some() {
             error!(
                 "PCI: {}.0 indicates single function, but {}.{} is already populated",
-                slot,
-                slot,
-                func
+                slot, slot, func
             );
         }
     }
     Ok(())
 }
 
+pub trait MsiIrqManager: Send + Sync {
+    fn trigger(&self, _vector: MsiVector, _dev_id: u32) -> Result<()> {
+        Ok(())
+    }
+}

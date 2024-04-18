@@ -16,9 +16,8 @@ pub use apic_timer::{ApicBaseMsrHandler, VirtLocalApic};
 pub use bundle::Bundle;
 pub use debug_port::DebugPort;
 pub use dummy::Dummy;
+use hypercraft::VirtMsrOps;
 pub use i8259_pic::I8259Pic;
-pub use pci::PCIConfigurationSpace;
-
 pub use port_passthrough::PortPassthrough;
 pub use uart16550::{MultiplexConsoleBackend, Uart16550};
 

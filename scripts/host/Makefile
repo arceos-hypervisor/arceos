@@ -2,7 +2,7 @@ QEMU ?= qemu-system-x86_64
 PORT ?= 2333
 WORKSPACE ?= $(shell pwd)/../../..
 target_bin := $(WORKSPACE)/arceos/apps/hv/hv_pc-x86.bin 
-jailhouse := $(WORKSPACE)/jailhouse
+jailhouse := $(WORKSPACE)/jailhouse-arceos
 guest := $(WORKSPACE)/arceos/scripts/guest/*
 
 OUT_ELF ?= ../../apps/hv/hv_pc-x86.elf
@@ -36,7 +36,7 @@ echo_workspace:
 	echo ${WORKSPACE}
 
 qemu: $(qemu_image)
-	sudo $(QEMU) $(qemu_args)
+	$(QEMU) $(qemu_args)
 
 qemu_debug: $(qemu_image)
 	$(QEMU) $(qemu_args) -s -S
@@ -51,7 +51,7 @@ ssh:
 	ssh -p $(PORT) ubuntu@localhost
 
 scp_bin:
-	scp -P $(PORT) -r $(target_bin) ubuntu@localhost:/home/ubuntu
+	scp -P $(PORT) -r $(target_bin) ubuntu@localhost:/home/ubuntu/arceos-intel.bin
 
 scp_jailhouse:
 	scp -P $(PORT) -r $(jailhouse) ubuntu@localhost:/home/ubuntu

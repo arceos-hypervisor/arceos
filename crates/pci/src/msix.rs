@@ -1,15 +1,3 @@
-// Copyright (c) 2020 Huawei Technologies Co.,Ltd. All rights reserved.
-//
-// StratoVirt is licensed under Mulan PSL v2.
-// You can use this software according to the terms and conditions of the Mulan
-// PSL v2.
-// You may obtain a copy of Mulan PSL v2 at:
-//         http://license.coscl.org.cn/MulanPSL2
-// THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY
-// KIND, EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-// NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
-// See the Mulan PSL v2 for more details.
-
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::cmp::max;
@@ -18,12 +6,9 @@ use spin::Mutex;
 
 use crate::config::{CapId, RegionType, MINIMUM_BAR_SIZE_FOR_MMIO};
 use crate::util::num_ops::{ranges_overlap, round_up};
-use crate::{
-    le_read_u16, le_read_u32, le_read_u64, le_write_u16, le_write_u32, le_write_u64, PciDevBase,
-};
-use crate::errors::PciResult as Result;
-
-type GuestAddress = u64;
+use crate::MsiIrqManager;
+use crate::{le_read_u16, le_read_u64, le_write_u16, le_write_u32, le_write_u64, PciDevBase};
+use hypercraft::{HyperError, HyperResult, RegionOps};
 
 pub const MSIX_TABLE_ENTRY_SIZE: u16 = 16;
 pub const MSIX_TABLE_SIZE_MAX: u16 = 0x7ff;
@@ -31,7 +16,6 @@ const MSIX_TABLE_VEC_CTL: u16 = 0x0c;
 const MSIX_TABLE_MASK_BIT: u8 = 0x01;
 pub const MSIX_TABLE_BIR: u16 = 0x07;
 pub const MSIX_TABLE_OFFSET: u32 = 0xffff_fff8;
-const MSIX_MSG_UPPER_ADDR: u16 = 0x04;
 const MSIX_MSG_DATA: u16 = 0x08;
 
 pub const MSIX_CAP_CONTROL: u8 = 0x02;
@@ -40,6 +24,14 @@ pub const MSIX_CAP_FUNC_MASK: u16 = 0x4000;
 pub const MSIX_CAP_SIZE: u8 = 12;
 pub const MSIX_CAP_ID: u8 = 0x11;
 pub const MSIX_CAP_TABLE: u8 = 0x04;
+pub const MSI_ADDR_BASE: u64 = 0xfee0_0000;
+
+pub const MSI_ADDR_DEST_MODE_MASK: u32 = 0x4; // [2]
+pub const MSI_ADDR_RH_MASK: u32 = 0x8; // [3]
+pub const MSI_ADDR_RSVD_2_MASK: u32 = 0xff0; // [11:4]
+pub const MSI_ADDR_DEST_FIELD_MASK: u32 = 0xff000; // [19:12]
+pub const MSI_ADDR_ADDR_BASE_MASK: u32 = 0xfff00000; // [31:20]
+
 const MSIX_CAP_PBA: u8 = 0x08;
 
 /// Basic data for msi vector.
@@ -76,21 +68,7 @@ pub struct Msix {
     pub dev_id: Arc<AtomicU16>,
     pub msi_irq_manager: Option<Arc<dyn MsiIrqManager>>,
 }
-/*
-struct {
-        int	enabled;
-        int	table_bar;
-        int	pba_bar;
-        uint32_t table_offset;
-        int	table_count;
-        uint32_t pba_offset;
-        int	pba_size;
-        int	function_mask;
-        struct msix_table_entry *table;	/* allocated at runtime */
-        void	*pba_page;
-        int	pba_page_offset;
-    } msix;
-*/
+
 impl Msix {
     /// Construct a new MSI-X structure.
     ///
@@ -197,35 +175,6 @@ impl Msix {
         }
     }
 
-    fn update_irq_routing(&mut self, vector: u16, is_masked: bool) -> Result<()> {
-        let entry = self.get_message(vector);
-        let route = if let Some(route) = self.gsi_msi_routes.get_mut(&vector) {
-            route
-        } else {
-            return Ok(());
-        };
-
-        let msix_vector = self.get_msix_vector(vector);
-
-        let irq_manager = self.msi_irq_manager.as_ref().unwrap();
-
-        if is_masked {
-            irq_manager.unregister_irqfd(route.irq_fd.clone(), route.gsi as u32)?;
-        } else {
-            let msg = &route.msg;
-            if msg.data != entry.data
-                || msg.address_lo != entry.address_lo
-                || msg.address_hi != entry.address_hi
-            {
-                irq_manager.update_route_table(route.gsi as u32, msix_vector)?;
-                route.msg = entry;
-            }
-
-            irq_manager.register_irqfd(route.irq_fd.clone(), route.gsi as u32)?;
-        }
-        Ok(())
-    } 
-
     pub fn get_msix_vector(&self, vector: u16) -> MsiVector {
         let entry_offset: u16 = vector * MSIX_TABLE_ENTRY_SIZE;
         let mut offset = entry_offset as usize;
@@ -291,42 +240,56 @@ impl Msix {
         }
     }
 
-    fn register_memory_region(
-        _msix: Arc<Mutex<Self>>,
-        region: &Region,
-        _dev_id: Arc<AtomicU16>,
-        _table_offset: u64,
-        _pba_offset: u64,
-    ) -> Result<()> {
-        let locked_msix = msix.lock();
-        let table_size = locked_msix.table.len() as u64;
-        let pba_size = locked_msix.pba.len() as u64;
+    fn generate_region_ops(
+        msix: Arc<Mutex<Self>>,
+        dev_id: Arc<AtomicU16>,
+    ) -> HyperResult<RegionOps> {
+        // let locked_msix = msix.lock();
+        // let table_size = locked_msix.table.len() as u64;
+        // let pba_size = locked_msix.pba.len() as u64;
 
         let cloned_msix = msix.clone();
-        let table_read = move |data: &mut [u8], _addr: GuestAddress, offset: u64| -> bool {
-            if offset as usize + data.len() > cloned_msix.lock().table.len() {
-                error!(
-                    "It's forbidden to read out of the msix table(size: {}), with offset of {} and size of {}",
-                    cloned_msix.lock().table.len(),
-                    offset,
-                    data.len()
+        let read = move |offset: u64, access_size: u8| -> HyperResult<u32> {
+            let mut data = [0u8; 4];
+            let access_offset = offset as usize + access_size as usize;
+            if access_offset > cloned_msix.lock().table.len() {
+                if access_offset > cloned_msix.lock().table.len() + cloned_msix.lock().pba.len() {
+                    error!(
+                        "Fail to read msix table and pba, illegal data length {}, offset {}",
+                        access_size, offset
+                    );
+                    return Err(HyperError::OutOfRange);
+                }
+                // deal with pba read
+                let offset = offset as usize;
+                data.copy_from_slice(
+                    &cloned_msix.lock().pba[offset..(offset + access_size as usize)],
                 );
-                return false;
+                return Ok(u32::from_le_bytes(data));
             }
-            let offset = offset as usize;
-            data.copy_from_slice(&cloned_msix.lock().table[offset..(offset + data.len())]);
-            true
+            // msix table read
+            data.copy_from_slice(
+                &cloned_msix.lock().table
+                    [offset as usize..(offset as usize + access_size as usize)],
+            );
+            Ok(u32::from_le_bytes(data))
         };
+
         let cloned_msix = msix.clone();
-        let table_write = move |data: &[u8], _addr: GuestAddress, offset: u64| -> bool {
-            if offset as usize + data.len() > cloned_msix.lock().table.len() {
-                error!(
-                    "It's forbidden to write out of the msix table(size: {}), with offset of {} and size of {}",
-                    cloned_msix.lock().table.len(),
-                    offset,
-                    data.len()
-                );
-                return false;
+        let write = move |offset: u64, access_size: u8, data: &[u8]| -> HyperResult {
+            let access_offset = offset as usize + access_size as usize;
+            if access_offset > cloned_msix.lock().table.len() {
+                if access_offset > cloned_msix.lock().table.len() + cloned_msix.lock().pba.len() {
+                    error!(
+                        "It's forbidden to write out of the msix table and pba (size: {}), with offset of {} and size of {}",
+                        cloned_msix.lock().table.len(),
+                        offset,
+                        data.len()
+                    );
+                    return Err(HyperError::OutOfRange);
+                }
+                // deal with pba read
+                return Ok(());
             }
             let mut locked_msix = cloned_msix.lock();
             let vector: u16 = offset as u16 / MSIX_TABLE_ENTRY_SIZE;
@@ -335,10 +298,6 @@ impl Msix {
             locked_msix.table[offset..(offset + 4)].copy_from_slice(data);
 
             let is_masked: bool = locked_msix.is_vector_masked(vector);
-            if was_masked != is_masked && locked_msix.update_irq_routing(vector, is_masked).is_err()
-            {
-                return false;
-            }
 
             // Clear the pending vector just when it is pending. Otherwise, it
             // will cause unknown error.
@@ -347,42 +306,14 @@ impl Msix {
                 locked_msix.notify(vector, dev_id.load(Ordering::Acquire));
             }
 
-            true
+            Ok(())
         };
-        let table_region_ops = RegionOps {
-            read: Arc::new(table_read),
-            write: Arc::new(table_write),
+        let msix_region_ops = RegionOps {
+            read: Arc::new(read),
+            write: Arc::new(write),
         };
-        let table_region = Region::init_io_region(table_size, table_region_ops, "MsixTable");
-        region
-            .add_subregion(table_region, table_offset)
-            .with_context(|| "Failed to register MSI-X table region.")?;
 
-        let cloned_msix = msix.clone();
-        let pba_read = move |data: &mut [u8], _addr: GuestAddress, offset: u64| -> bool {
-            if offset as usize + data.len() > cloned_msix.lock().pba.len() {
-                error!(
-                    "Fail to read msi pba, illegal data length {}, offset {}",
-                    data.len(),
-                    offset
-                );
-                return false;
-            }
-            let offset = offset as usize;
-            data.copy_from_slice(&cloned_msix.lock().pba[offset..(offset + data.len())]);
-            true
-        };
-        let pba_write = move |_data: &[u8], _addr: GuestAddress, _offset: u64| -> bool { true };
-        let pba_region_ops = RegionOps {
-            read: Arc::new(pba_read),
-            write: Arc::new(pba_write),
-        };
-        let pba_region = Region::init_io_region(pba_size, pba_region_ops, "MsixPba");
-        region
-            .add_subregion(pba_region, pba_offset)
-            .with_context(|| "Failed to register MSI-X PBA region.")?;
-
-        Ok(())
+        Ok(msix_region_ops)
     }
 }
 
@@ -404,8 +335,7 @@ pub fn init_msix(
     dev_id: Arc<AtomicU16>,
     // parent_region: Option<&Region>,
     offset_opt: Option<(u32, u32)>,
-    msi_irq_manager: Option<Arc<dyn MsiIrqManager>>,
-) -> Result<()> {
+) -> HyperResult<()> {
     let config = &mut pcidev_base.config;
     let parent_bus = &pcidev_base.parent_bus;
     if vector_nr == 0 || vector_nr > MSIX_TABLE_SIZE_MAX as u32 + 1 {
@@ -441,13 +371,13 @@ pub fn init_msix(
     offset = msix_cap_offset + MSIX_CAP_PBA as usize;
     le_write_u32(&mut config.config, offset, pba_offset | bar_id as u32)?;
 
-    // let msi_irq_manager = if let Some(pci_bus) = parent_bus.upgrade() {
-    //     let locked_pci_bus = pci_bus.lock();
-    //     locked_pci_bus.get_msi_irq_manager()
-    // } else {
-    //     error!("Msi irq controller is none");
-    //     None
-    // };
+    let msi_irq_manager = if let Some(pci_bus) = parent_bus.upgrade() {
+        let locked_pci_bus = pci_bus.lock();
+        locked_pci_bus.get_msi_irq_manager()
+    } else {
+        error!("Msi irq controller is none");
+        None
+    };
 
     let msix = Arc::new(Mutex::new(Msix::new(
         table_size,
@@ -456,57 +386,22 @@ pub fn init_msix(
         dev_id.clone(),
         msi_irq_manager,
     )));
-    if let Some(region) = parent_region {
-        Msix::register_memory_region(
-            msix.clone(),
-            region,
-            dev_id,
-            table_offset as u64,
-            pba_offset as u64,
-        )?;
-    } else {
-        let mut bar_size = ((table_size + pba_size) as u64).next_power_of_two();
-        bar_size = max(bar_size, MINIMUM_BAR_SIZE_FOR_MMIO as u64);
-        let region = Region::init_container_region(bar_size, "Msix_region");
-        Msix::register_memory_region(
-            msix.clone(),
-            &region,
-            dev_id,
-            table_offset as u64,
-            pba_offset as u64,
-        )?;
-        config.register_bar(bar_id, region, RegionType::Mem32Bit, false, bar_size)?;
-    }
+    let mut bar_size = ((table_size + pba_size) as u64).next_power_of_two();
+    bar_size = max(bar_size, MINIMUM_BAR_SIZE_FOR_MMIO as u64);
+    let msix_region_ops = Msix::generate_region_ops(msix.clone(), dev_id).unwrap();
+    config.register_bar(
+        bar_id,
+        Some(msix_region_ops),
+        RegionType::Mem32Bit,
+        false,
+        bar_size,
+    )?;
 
     config.msix = Some(msix.clone());
 
     Ok(())
 }
 
-pub trait MsiIrqManager: Send + Sync {
-    fn allocate_irq(&self, _vector: MsiVector) -> Result<u32> {
-        Ok(0)
-    }
-
-    fn release_irq(&self, _irq: u32) -> Result<()> {
-        Ok(())
-    }
-
-    fn register_irqfd(&self, _irq_fd: Arc<EventFd>, _irq: u32) -> Result<()> {
-        Ok(())
-    }
-
-    fn unregister_irqfd(&self, _irq_fd: Arc<EventFd>, _irq: u32) -> Result<()> {
-        Ok(())
-    }
-
-    fn trigger(
-        &self,
-        _vector: MsiVector,
-        _dev_id: u32,
-    ) -> Result<()> {
-        Ok(())
-    }
 // /**
 //  *@pre Pointer vm shall point to Service VM
 //  */
@@ -524,9 +419,6 @@ pub trait MsiIrqManager: Send + Sync {
 // 	vmsi_addr.full = addr;
 // 	vmsi_data.full = (uint32_t)data;
 
-// 	dev_dbg(DBG_LEVEL_LAPICPT, "%s: msi_addr 0x%016lx, msi_data 0x%016lx",
-// 		__func__, addr, data);
-
 // 	if (vmsi_addr.bits.addr_base == MSI_ADDR_BASE) {
 // 		vdest = vmsi_addr.bits.dest_field;
 // 		phys = (vmsi_addr.bits.dest_mode == MSI_ADDR_DESTMODE_PHYS);
@@ -536,7 +428,6 @@ pub trait MsiIrqManager: Send + Sync {
 // 		 * and handled by hardware.
 // 		 */
 // 		vdmask = vlapic_calc_dest_noshort(vm, false, vdest, phys, false);
-// 		dev_dbg(DBG_LEVEL_LAPICPT, "%s: vcpu destination mask 0x%016lx", __func__, vdmask);
 
 // 		vcpu_id = ffs64(vdmask);
 // 		while (vcpu_id != INVALID_BIT_INDEX) {
@@ -556,8 +447,3 @@ pub trait MsiIrqManager: Send + Sync {
 // 		dev_dbg(DBG_LEVEL_LAPICPT, "%s: icr.value 0x%016lx", __func__, icr.value);
 // 	}
 // }
-
-    fn update_route_table(&self, _gsi: u32, _vector: MsiVector) -> Result<()> {
-        Ok(())
-    }
-}

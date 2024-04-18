@@ -1,15 +1,3 @@
-// Copyright (c) 2020 Huawei Technologies Co.,Ltd. All rights reserved.
-//
-// StratoVirt is licensed under Mulan PSL v2.
-// You can use this software according to the terms and conditions of the Mulan
-// PSL v2.
-// You may obtain a copy of Mulan PSL v2 at:
-//         http://license.coscl.org.cn/MulanPSL2
-// THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY
-// KIND, EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-// NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
-// See the Mulan PSL v2 for more details.
-
 use super::errors::*;
 
 use byteorder::{ByteOrder, LittleEndian};
@@ -452,7 +440,9 @@ pub fn str_to_num<T: Num>(s: &str) -> Result<T, UtilError> {
         base = 16;
     }
     let without_prefix = s.trim().trim_start_matches("0x").trim_start_matches("0X");
-    let num = T::from_str_radix(without_prefix, base).map_err(|_| UtilError::NumInvalid { num: s.parse().unwrap_or(0) })?;
+    let num = T::from_str_radix(without_prefix, base).map_err(|_| UtilError::NumInvalid {
+        num: s.parse().unwrap_or(0),
+    })?;
     Ok(num)
 }
 /// Check whether two regions overlap with each other.
@@ -473,13 +463,20 @@ pub fn str_to_num<T: Num>(s: &str) -> Result<T, UtilError> {
 /// let value = ranges_overlap(100, 100, 150, 100).unwrap();
 /// assert!(value == true);
 /// ```
-pub fn ranges_overlap(start1: usize, size1: usize, start2: usize, size2: usize) -> Result<bool, UtilError> {
-    let end1 = start1
-        .checked_add(size1)
-        .ok_or(UtilError::NumOverflow { start: start1, size: size1 })?;
-    let end2 = start2
-        .checked_add(size2)
-        .ok_or(UtilError::NumOverflow { start: start2, size: size2 })?;
+pub fn ranges_overlap(
+    start1: usize,
+    size1: usize,
+    start2: usize,
+    size2: usize,
+) -> Result<bool, UtilError> {
+    let end1 = start1.checked_add(size1).ok_or(UtilError::NumOverflow {
+        start: start1,
+        size: size1,
+    })?;
+    let end2 = start2.checked_add(size2).ok_or(UtilError::NumOverflow {
+        start: start2,
+        size: size2,
+    })?;
 
     Ok(!(start1 >= end2 || start2 >= end1))
 }

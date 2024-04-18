@@ -1,5 +1,5 @@
-use crate::device::PioOps;
 use crate::Result as HyperResult;
+use hypercraft::PioOps;
 
 pub struct DebugPort {
     port: u16,
@@ -21,7 +21,7 @@ impl PioOps for DebugPort {
         Ok(0)
     }
 
-    fn write(&mut self, _port: u16, _access_size: u8, _value: &[u8]) -> HyperResult {
+    fn write(&mut self, _port: u16, _access_size: u8, _value: u32) -> HyperResult {
         // debug!("a byte written to debug port {:#x}: {:#4x}", port, value as u8);
         Ok(())
     }

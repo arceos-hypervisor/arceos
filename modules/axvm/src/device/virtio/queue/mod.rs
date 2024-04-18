@@ -14,12 +14,11 @@ mod split;
 
 pub use split::*;
 
-use std::sync::Arc;
-
-use anyhow::{bail, Result};
-use vmm_sys_util::eventfd::EventFd;
-
-use address_space::{AddressSpace, GuestAddress, RegionCache};
+use alloc::boxed::Box;
+use alloc::format;
+use alloc::sync::Arc;
+use alloc::vec::Vec;
+use hypercraft::{HyperError, HyperResult as Result, VirtioError};
 
 /// Split Virtqueue.
 pub const QUEUE_TYPE_SPLIT_VRING: u16 = 1;
@@ -35,26 +34,15 @@ const VIRTQ_DESC_F_WRITE: u16 = 0x2;
 /// This means the buffer contains a list of buffer descriptors.
 const VIRTQ_DESC_F_INDIRECT: u16 = 0x4;
 
-fn checked_offset_mem(
-    mmio_space: &Arc<AddressSpace>,
-    base: GuestAddress,
-    offset: u64,
-) -> Result<GuestAddress> {
-    if !mmio_space.address_in_memory(base, offset) {
-        bail!(
-            "Invalid Address for queue: base 0x{:X}, size {}",
-            base.raw_value(),
-            offset
-        );
-    }
-    Ok(base.unchecked_add(offset))
+fn checked_offset_mem() -> Result<u64> {
+    Ok(0)
 }
 
 /// IO vector element which contains the information of a descriptor.
 #[derive(Debug, Clone, Copy)]
 pub struct ElemIovec {
     /// Guest address of descriptor.
-    pub addr: GuestAddress,
+    pub addr: u64,
     /// Length of descriptor.
     pub len: u32,
 }
@@ -105,7 +93,7 @@ pub trait VringOps {
     /// # Arguments
     ///
     /// * `sys_mem` - Address space to which the vring belongs.
-    fn is_valid(&self, sys_mem: &Arc<AddressSpace>) -> bool;
+    fn is_valid(&self) -> bool;
 
     /// Assemble an IO request element with descriptors from the available vring.
     ///
@@ -113,7 +101,7 @@ pub trait VringOps {
     ///
     /// * `sys_mem` - Address space to which the vring belongs.
     /// * `features` - Bit mask of features negotiated by the backend and the frontend.
-    fn pop_avail(&mut self, sys_mem: &Arc<AddressSpace>, features: u64) -> Result<Element>;
+    fn pop_avail(&mut self, features: u64) -> Result<Element>;
 
     /// Rollback the entry which is pop from available queue by `pop_avail`.
     fn push_back(&mut self);
@@ -125,7 +113,7 @@ pub trait VringOps {
     /// * `sys_mem` - Address space to which the vring belongs.
     /// * `index` - Index of descriptor in the virqueue descriptor table.
     /// * `len` - Total length of the descriptor chain which was used (written to).
-    fn add_used(&mut self, sys_mem: &Arc<AddressSpace>, index: u16, len: u32) -> Result<()>;
+    fn add_used(&mut self, index: u16, len: u32) -> Result<()>;
 
     /// Return true if guest needed to be notified.
     ///
@@ -133,7 +121,7 @@ pub trait VringOps {
     ///
     /// * `sys_mem` - Address space to which the vring belongs.
     /// * `features` - Bit mask of features negotiated by the backend and the frontend.
-    fn should_notify(&mut self, sys_mem: &Arc<AddressSpace>, features: u64) -> bool;
+    fn should_notify(&mut self, features: u64) -> bool;
 
     /// Give guest a hint to suppress virtqueue notification.
     ///
@@ -142,12 +130,7 @@ pub trait VringOps {
     /// * `sys_mem` - Address space to which the vring belongs.
     /// * `features` - Bit mask of features negotiated by the backend and the frontend.
     /// * `suppress` - Suppress virtqueue notification or not.
-    fn suppress_queue_notify(
-        &mut self,
-        sys_mem: &Arc<AddressSpace>,
-        features: u64,
-        suppress: bool,
-    ) -> Result<()>;
+    fn suppress_queue_notify(&mut self, features: u64, suppress: bool) -> Result<()>;
 
     /// Get the actual size of the vring.
     fn actual_size(&self) -> u16;
@@ -156,24 +139,19 @@ pub trait VringOps {
     fn get_queue_config(&self) -> QueueConfig;
 
     /// The number of descriptor chains in the available ring.
-    fn avail_ring_len(&mut self, sys_mem: &Arc<AddressSpace>) -> Result<u16>;
+    fn avail_ring_len(&mut self) -> Result<u16>;
 
     /// Get the avail index of the vring.
-    fn get_avail_idx(&self, sys_mem: &Arc<AddressSpace>) -> Result<u16>;
+    fn get_avail_idx(&self) -> Result<u16>;
 
     /// Get the used index of the vring.
-    fn get_used_idx(&self, sys_mem: &Arc<AddressSpace>) -> Result<u16>;
+    fn get_used_idx(&self) -> Result<u16>;
 
     /// Get the region cache information of the SplitVring.
-    fn get_cache(&self) -> &Option<RegionCache>;
+    fn get_cache(&self) -> &Option<u32>;
 
     /// Get the available bytes of the vring to read from or write to the guest
-    fn get_avail_bytes(
-        &mut self,
-        sys_mem: &Arc<AddressSpace>,
-        max_size: usize,
-        is_in: bool,
-    ) -> Result<usize>;
+    fn get_avail_bytes(&mut self, max_size: usize, is_in: bool) -> Result<usize>;
 }
 
 /// Virtio queue.
@@ -193,7 +171,10 @@ impl Queue {
         let vring: Box<dyn VringOps + Send> = match queue_type {
             QUEUE_TYPE_SPLIT_VRING => Box::new(SplitVring::new(queue_config)),
             _ => {
-                bail!("Unsupported queue type {}", queue_type);
+                return Err(HyperError::VirtioError(VirtioError::Other(format!(
+                    "Unsupported queue type: {}",
+                    queue_type
+                ))))
             }
         };
 
@@ -210,24 +191,7 @@ impl Queue {
     /// # Arguments
     ///
     /// * `sys_mem` - Address space to which the vring belongs.
-    pub fn is_valid(&self, sys_mem: &Arc<AddressSpace>) -> bool {
-        self.vring.is_valid(sys_mem)
-    }
-}
-
-/// Virt Queue Notify EventFds
-#[derive(Clone)]
-pub struct NotifyEventFds {
-    pub events: Vec<Arc<EventFd>>,
-}
-
-impl NotifyEventFds {
-    pub fn new(queue_num: usize) -> Self {
-        let mut events = Vec::new();
-        for _i in 0..queue_num {
-            events.push(Arc::new(EventFd::new(libc::EFD_NONBLOCK).unwrap()));
-        }
-
-        NotifyEventFds { events }
+    pub fn is_valid(&self) -> bool {
+        self.vring.is_valid()
     }
 }

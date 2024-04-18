@@ -1,28 +1,18 @@
-// Copyright (c) 2020 Huawei Technologies Co.,Ltd. All rights reserved.
-//
-// StratoVirt is licensed under Mulan PSL v2.
-// You can use this software according to the terms and conditions of the Mulan
-// PSL v2.
-// You may obtain a copy of Mulan PSL v2 at:
-//         http://license.coscl.org.cn/MulanPSL2
-// THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY
-// KIND, EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-// NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
-// See the Mulan PSL v2 for more details.
-use alloc::collections::BTreeSet;
-use alloc::vec::Vec;
-use alloc::sync::Arc;
-use alloc::string::String;
-use spin::Mutex;
-
 use crate::msix::{Msix, MSIX_TABLE_ENTRY_SIZE};
+use crate::util::num_ops::ranges_overlap;
 use crate::{
     le_read_u16, le_read_u32, le_read_u64, le_write_u16, le_write_u32, le_write_u64,
     pci_ext_cap_next, PciBus,
 };
-use crate::errors::{PciResult as Result, PciError};
-// use address_space::Region;
-use crate::util::num_ops::ranges_overlap;
+use alloc::collections::BTreeSet;
+use alloc::string::String;
+use alloc::sync::Arc;
+use alloc::vec::Vec;
+use core::ops::Range;
+use hashbrown::HashMap;
+use hypercraft::{HyperError, HyperResult as Result, PciError};
+use hypercraft::{HyperResult, MmioOps, PioOps, RegionOps};
+use spin::Mutex;
 
 /// Size in bytes of the configuration space of legacy PCI device.
 pub const PCI_CONFIG_SPACE_SIZE: usize = 256;
@@ -336,6 +326,59 @@ pub struct Bar {
     region_type: RegionType,
     address: u64,
     pub size: u64,
+    ops: Option<RegionOps>,
+}
+
+impl PioOps for Bar {
+    fn port_range(&self) -> core::ops::Range<u16> {
+        self.address as u16..(self.address + self.size) as u16
+    }
+
+    fn read(&mut self, port: u16, access_size: u8) -> HyperResult<u32> {
+        let offset = port - self.address as u16;
+        let read_func = &*self.ops.as_ref().unwrap().read;
+        let ret = read_func(offset as u64, access_size)?;
+        Ok(ret as u32)
+    }
+
+    fn write(&mut self, port: u16, access_size: u8, value: u32) -> HyperResult {
+        let offset = port - self.address as u16;
+        let write_func = &*self.ops.as_ref().unwrap().write;
+        let value_bytes = value.to_le_bytes();
+        let value_byte: &[u8] = match access_size {
+            1 => &value_bytes[0..1],
+            2 => &value_bytes[0..2],
+            4 => &value_bytes[0..4],
+            _ => return Err(HyperError::InValidPioWrite),
+        };
+        write_func(offset as u64, access_size, value_byte)
+    }
+}
+
+impl MmioOps for Bar {
+    fn mmio_range(&self) -> core::ops::Range<u64> {
+        self.address..self.address + self.size
+    }
+
+    fn read(&mut self, addr: u64, access_size: u8) -> hypercraft::HyperResult<u64> {
+        let offset = addr - self.address;
+        let read_func = &*self.ops.as_ref().unwrap().read;
+        let ret = read_func(offset, access_size)?;
+        Ok(ret as u64)
+    }
+
+    fn write(&mut self, addr: u64, access_size: u8, value: u32) -> hypercraft::HyperResult {
+        let offset = addr - self.address;
+        let write_func = &*self.ops.as_ref().unwrap().write;
+        let value_bytes = value.to_le_bytes();
+        let value_byte: &[u8] = match access_size {
+            1 => &value_bytes[0..1],
+            2 => &value_bytes[0..2],
+            4 => &value_bytes[0..4],
+            _ => return Err(HyperError::InValidMmioWrite),
+        };
+        write_func(offset, access_size, value_byte)
+    }
 }
 
 /// Capbility ID defined by PCIe/PCI spec.
@@ -394,6 +437,10 @@ pub struct PciConfig {
     pub last_ext_cap_end: u16,
     /// MSI-X information.
     pub msix: Option<Arc<Mutex<Msix>>>,
+    /// PIO Bars of virtio device
+    pub pios: HashMap<Range<u16>, Arc<Mutex<dyn PioOps>>>,
+    /// MMIO Bars of virtio device
+    pub mmios: HashMap<Range<u64>, Arc<Mutex<dyn MmioOps>>>,
 }
 
 impl PciConfig {
@@ -410,6 +457,7 @@ impl PciConfig {
                 region_type: RegionType::Mem32Bit,
                 address: 0,
                 size: 0,
+                ops: None,
             });
         }
 
@@ -422,6 +470,8 @@ impl PciConfig {
             last_ext_cap_offset: 0,
             last_ext_cap_end: PCI_CONFIG_SPACE_SIZE as u16,
             msix: None,
+            pios: HashMap::new(),
+            mmios: HashMap::new(),
         }
     }
 
@@ -513,16 +563,6 @@ impl PciConfig {
         }
 
         let size = buf.len();
-        // SAFETY: checked in "validate_config_boundary".
-        if ranges_overlap(offset, size, STATUS as usize, 1).unwrap() {
-            if let Some(intx) = &self.intx {
-                if intx.lock().level == 1 {
-                    self.config[STATUS as usize] |= STATUS_INTERRUPT;
-                } else {
-                    self.config[STATUS as usize] &= !STATUS_INTERRUPT;
-                }
-            }
-        }
 
         buf[..].copy_from_slice(&self.config[offset..(offset + size)]);
     }
@@ -530,20 +570,20 @@ impl PciConfig {
     fn validate_config_boundary(&self, offset: usize, data: &[u8]) -> Result<()> {
         // According to pcie specification 7.2.2.2 PCI Express Device Requirements:
         if data.len() > 4 {
-            return Err(PciError::InvalidConf(
+            return Err(HyperError::PciError(PciError::InvalidConf(
                 String::from("data size"),
-                format!("{}", data.len())
-            ));
+                format!("{}", data.len()),
+            )));
         }
 
         offset
             .checked_add(data.len())
             .filter(|&end| end <= self.config.len())
             .ok_or_else(|| {
-                PciError::InvalidConf(
+                HyperError::PciError(PciError::InvalidConf(
                     String::from("config size"),
                     format!("offset {} with len {}", offset, data.len()),
-                )
+                ))
             })?;
 
         Ok(())
@@ -556,14 +596,7 @@ impl PciConfig {
     /// * `offset` - Offset in the configuration space from which to write.
     /// * `data` - Data to write.
     /// * `dev_id` - Device id to send MSI/MSI-X.
-    pub fn write(
-        &mut self,
-        mut offset: usize,
-        data: &[u8],
-        dev_id: u16,
-        #[cfg(target_arch = "x86_64")] io_region: Option<&Region>,
-        mem_region: Option<&Region>,
-    ) {
+    pub fn write(&mut self, mut offset: usize, data: &[u8], dev_id: u16) {
         if let Err(err) = self.validate_config_boundary(offset, data) {
             error!("invalid write: {:?}", err);
             return;
@@ -578,6 +611,7 @@ impl PciConfig {
             offset += 1;
         }
 
+        // Expansion ROM Base Address: 0x30-0x33 for endpoint, 0x38-0x3b for bridge.
         let (bar_num, rom_addr) = match self.config[HEADER_TYPE as usize] & HEADER_TYPE_BRIDGE {
             HEADER_TYPE_BRIDGE => (BAR_NUM_MAX_FOR_BRIDGE as usize, ROM_ADDRESS_BRIDGE),
             _ => (BAR_NUM_MAX_FOR_ENDPOINT as usize, ROM_ADDRESS_ENDPOINT),
@@ -585,44 +619,18 @@ impl PciConfig {
 
         let size = data.len();
         // SAFETY: checked in "validate_config_boundary".
+        // check if command bit or bar region or expansion rom base addr changed, then update it.
         let cmd_overlap = ranges_overlap(old_offset, size, COMMAND as usize, 1).unwrap();
         if cmd_overlap
             || ranges_overlap(old_offset, size, BAR_0 as usize, REG_SIZE * bar_num).unwrap()
             || ranges_overlap(old_offset, size, rom_addr, 4).unwrap()
         {
-            if let Err(e) = self.update_bar_mapping(
-                #[cfg(target_arch = "x86_64")]
-                io_region,
-                mem_region,
-            ) {
+            if let Err(e) = self.update_bar_mapping(false) {
                 error!("{:?}", e);
             }
         }
 
-        if cmd_overlap {
-            if let Some(intx) = &self.intx {
-                let cmd = le_read_u16(self.config.as_slice(), COMMAND as usize).unwrap();
-                let enabled = cmd & COMMAND_INTERRUPT_DISABLE == 0;
-
-                let mut locked_intx = intx.lock();
-                if locked_intx.enabled != enabled {
-                    if !enabled {
-                        locked_intx.change_irq_level(-(locked_intx.level as i8));
-                    } else {
-                        locked_intx.change_irq_level(locked_intx.level as i8);
-                    }
-                    locked_intx.enabled = enabled;
-                }
-            }
-        }
-
         if let Some(msix) = &mut self.msix {
-            // if msix.lock().is_enabled(&self.config) {
-            //     if let Some(intx) = &self.intx {
-            //         intx.lock().notify(0);
-            //     }
-            // }
-
             msix.lock()
                 .write_config(&self.config, dev_id, old_offset, data);
         }
@@ -668,11 +676,7 @@ impl PciConfig {
 
         self.reset_common_regs()?;
 
-        if let Err(e) = self.update_bar_mapping(
-            // #[cfg(target_arch = "x86_64")]
-            // None,
-            // None,
-        ) {
+        if let Err(e) = self.update_bar_mapping(true) {
             error!("{:?}", e);
         }
 
@@ -743,14 +747,14 @@ impl PciConfig {
     /// # Arguments
     ///
     /// * `id` - Index of the BAR.
-    /// * `region` - Region mapped for the BAR.
+    /// * `ops` - RegionOps mapped for the BAR.
     /// * `region_type` - Region type of the BAR.
     /// * `prefetchable` - Indicate whether the BAR is prefetchable or not.
     /// * `size` - Size of the BAR.
     pub fn register_bar(
         &mut self,
         id: usize,
-        // region: Region,
+        ops: Option<RegionOps>,
         region_type: RegionType,
         prefetchable: bool,
         size: u64,
@@ -778,10 +782,10 @@ impl PciConfig {
             self.config[offset] |= BAR_PREFETCH;
         }
 
+        self.bars[id].ops = ops;
         self.bars[id].region_type = region_type;
         self.bars[id].address = BAR_SPACE_UNMAPPED;
         self.bars[id].size = size;
-        // self.bars[id].region = Some(region);
         Ok(())
     }
 
@@ -790,145 +794,118 @@ impl PciConfig {
     /// # Arguments
     ///
     /// * `bus` - The bus which region registered.
-    pub fn unregister_bars(&mut self, bus: &Arc<Mutex<PciBus>>) -> Result<()> {
+    pub fn unregister_bars(&mut self, _bus: &Arc<Mutex<PciBus>>) -> Result<()> {
         // let locked_bus = bus.lock();
-        // for bar in self.bars.iter_mut() {
-        //     if bar.address == BAR_SPACE_UNMAPPED || bar.size == 0 {
-        //         continue;
-        //     }
-        //     match bar.region_type {
-        //         RegionType::Io =>
-        //         {
-        //             #[cfg(target_arch = "x86_64")]
-        //             if let Some(region) = bar.region.as_ref() {
-        //                 locked_bus
-        //                     .io_region
-        //                     .delete_subregion(region)
-        //                     .with_context(|| "Failed to unregister io bar")?;
-        //             }
-        //         }
-        //         _ => {
-        //             if let Some(region) = bar.region.as_ref() {
-        //                 locked_bus
-        //                     .mem_region
-        //                     .delete_subregion(region)
-        //                     .with_context(|| "Failed to unregister mem bar")?;
-        //             }
-        //         }
-        //     }
-        //     bar.region = None;
-        // }
+        let mut pio_ranges_to_remove = Vec::new();
+        let mut mmio_ranges_to_remove = Vec::new();
+
+        for bar in self.bars.iter_mut() {
+            if bar.address == BAR_SPACE_UNMAPPED || bar.size == 0 {
+                continue;
+            }
+            match bar.region_type {
+                RegionType::Io => {
+                    #[cfg(target_arch = "x86_64")]
+                    {
+                        pio_ranges_to_remove
+                            .push(bar.address as u16..(bar.address + bar.size) as u16);
+                    }
+                }
+                _ => {
+                    mmio_ranges_to_remove.push(bar.address..(bar.address + bar.size));
+                }
+            }
+            bar.ops = None;
+        }
+        for range in pio_ranges_to_remove {
+            self.remove_pio(range);
+        }
+
+        for range in mmio_ranges_to_remove {
+            self.remove_mmio(range);
+        }
+
         Ok(())
     }
 
-    fn is_bar_region_empty(
-        &self,
-        id: usize,
-        #[cfg(target_arch = "x86_64")] io_region: Option<&Region>,
-        mem_region: Option<&Region>,
-    ) -> bool {
-        if self.bars[id].region_type == RegionType::Io {
-            #[cfg(target_arch = "x86_64")]
-            if io_region.is_none() {
-                return true;
-            }
-        } else if mem_region.is_none() {
-            return true;
-        }
-        false
-    }
-
     /// Update bar space mapping once the base address is updated by the guest.
-    ///
-    /// # Arguments
-    ///
-    /// * `io_region`: IO space region which the parent bridge manages.
-    /// * `mem_region`: Memory space region which the parent bridge manages.
-    pub fn update_bar_mapping(
-        &mut self,
-        #[cfg(target_arch = "x86_64")] io_region: Option<&Region>,
-        mem_region: Option<&Region>,
-    ) -> Result<()> {
+    pub fn update_bar_mapping(&mut self, is_empty: bool) -> Result<()> {
         for id in 0..self.bars.len() {
             if self.bars[id].size == 0 {
                 continue;
             }
 
             let new_addr: u64 = self.get_bar_address(id);
+            // if the bar is not updated, just skip it.
             if self.bars[id].address == new_addr {
                 continue;
             }
 
+            // first unmmap origin bar region
             if self.bars[id].address != BAR_SPACE_UNMAPPED {
                 match self.bars[id].region_type {
                     #[cfg(target_arch = "x86_64")]
                     RegionType::Io => {
-                        if self.bars[id].parent_io_region.is_some() {
-                            self.bars[id]
-                                .parent_io_region
-                                .as_ref()
-                                .unwrap()
-                                .lock()
-                                .unwrap()
-                                .delete_subregion(self.bars[id].region.as_ref().unwrap())
-                                .with_context(|| {
-                                    format!("Failed to unmap BAR{} in I/O space.", id)
-                                })?;
-                        }
+                        let range = (self.bars[id].address as u16)
+                            ..(self.bars[id].address + self.bars[id].size) as u16;
+                        self.remove_pio(range);
                     }
                     _ => {
-                        if self.bars[id].parent_mem_region.is_some() {
-                            self.bars[id]
-                                .parent_mem_region
-                                .as_ref()
-                                .unwrap()
-                                .lock()
-                                .unwrap()
-                                .delete_subregion(self.bars[id].region.as_ref().unwrap())
-                                .with_context(|| PciError::UnregMemBar(id))?
-                        }
+                        let range =
+                            self.bars[id].address..self.bars[id].address + self.bars[id].size;
+                        self.remove_mmio(range);
                     }
                 }
-
                 self.bars[id].address = BAR_SPACE_UNMAPPED;
             }
 
-            if self.is_bar_region_empty(
-                id,
-                #[cfg(target_arch = "x86_64")]
-                io_region,
-                mem_region,
-            ) {
+            if is_empty {
                 return Ok(());
             }
 
+            // map new region
             if new_addr != BAR_SPACE_UNMAPPED {
+                self.bars[id].address = new_addr;
                 match self.bars[id].region_type {
                     #[cfg(target_arch = "x86_64")]
                     RegionType::Io => {
-                        io_region
-                            .unwrap()
-                            .add_subregion(self.bars[id].region.clone().unwrap(), new_addr)
-                            .with_context(|| format!("Failed to map BAR{} in I/O space.", id))?;
-                        self.bars[id].parent_io_region =
-                            Some(Arc::new(Mutex::new(io_region.unwrap().clone())));
+                        // get the self bars[id], and update the address variable. insert it to pios
+                        let range = (new_addr as u16)..(new_addr + self.bars[id].size) as u16;
+                        self.add_pio(range, Arc::new(Mutex::new(self.bars[id].clone())));
                     }
                     _ => {
-                        mem_region
-                            .unwrap()
-                            .add_subregion(self.bars[id].region.clone().unwrap(), new_addr)
-                            .with_context(|| PciError::UnregMemBar(id))?;
-                        self.bars[id].parent_mem_region =
-                            Some(Arc::new(Mutex::new(mem_region.unwrap().clone())));
+                        let range = (new_addr as u64)..(new_addr + self.bars[id].size) as u64;
+                        self.add_mmio(range, Arc::new(Mutex::new(self.bars[id].clone())));
                     }
                 }
-
-                self.bars[id].address = new_addr;
             }
         }
         Ok(())
     }
 
+    /// Add a new PIO BAR to the configuration space.
+    pub fn add_pio(&mut self, range: Range<u16>, pio: Arc<Mutex<dyn PioOps>>) {
+        self.pios.insert(range, pio);
+    }
+
+    /// Remove a PIO BAR from the configuration space.
+    pub fn remove_pio(&mut self, range: Range<u16>) {
+        if self.pios.contains_key(&range) {
+            self.pios.remove(&range);
+        }
+    }
+
+    /// Add a new MMIO BAR to the configuration space.
+    pub fn add_mmio(&mut self, range: Range<u64>, mmio: Arc<Mutex<dyn MmioOps>>) {
+        self.mmios.insert(range, mmio);
+    }
+
+    /// Remove a MMIO BAR from the configuration space.
+    pub fn remove_mmio(&mut self, range: Range<u64>) {
+        if self.mmios.contains_key(&range) {
+            self.mmios.remove(&range);
+        }
+    }
     /// Add a pci standard capability in the configuration space.
     ///
     /// # Arguments
@@ -938,7 +915,7 @@ impl PciConfig {
     pub fn add_pci_cap(&mut self, id: u8, size: usize) -> Result<usize> {
         let offset = self.last_cap_end as usize;
         if offset + size > PCI_CONFIG_SPACE_SIZE {
-            return Err(PciError::AddPciCap(id, size));
+            return Err(HyperError::PciError(PciError::AddPciCap(id, size)));
         }
 
         self.config[offset] = id;
@@ -969,7 +946,7 @@ impl PciConfig {
     pub fn add_pcie_ext_cap(&mut self, id: u16, size: usize, version: u32) -> Result<usize> {
         let offset = self.last_ext_cap_end as usize;
         if offset + size > PCIE_CONFIG_SPACE_SIZE {
-            return Err(PciError::AddPcieExtCap(id, size));
+            return Err(HyperError::PciError(PciError::AddPcieExtCap(id, size)));
         }
 
         let regs_num = if size % REG_SIZE == 0 {
@@ -1000,8 +977,6 @@ impl PciConfig {
         Ok(offset)
     }
 
-
-
     /// Calculate the next extended cap size from pci config space.
     ///
     /// # Arguments
@@ -1028,10 +1003,10 @@ impl PciConfig {
             || (self.config[HEADER_TYPE as usize] == HEADER_TYPE_BRIDGE
                 && id >= BAR_NUM_MAX_FOR_BRIDGE as usize)
         {
-            return Err(PciError::InvalidConf(
+            return Err(HyperError::PciError(PciError::InvalidConf(
                 String::from("Bar id"),
                 format!("{}", id),
-            ));
+            )));
         }
         Ok(())
     }
@@ -1042,18 +1017,15 @@ impl PciConfig {
             || (bar_type == RegionType::Mem32Bit && size > u32::MAX as u64)
             || (bar_type == RegionType::Io && size > u16::MAX as u64)
         {
-            return Err(PciError::InvalidConf(
+            return Err(HyperError::PciError(PciError::InvalidConf(
                 String::from("Bar size of type ") + format!("{}", bar_type).as_str(),
                 format!("{}", size),
-            ));
+            )));
         }
         Ok(())
     }
 
-    pub fn set_interrupt_pin(&mut self) {
-        self.config[INTERRUPT_PIN as usize] = 0x01;
-    }
-
+    /// check if the msix is valid
     pub fn revise_msix_vector(&self, vector_nr: u32) -> bool {
         if self.msix.is_none() {
             return false;

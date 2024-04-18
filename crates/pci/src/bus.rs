@@ -1,15 +1,3 @@
-// Copyright (c) 2020 Huawei Technologies Co.,Ltd. All rights reserved.
-//
-// StratoVirt is licensed under Mulan PSL v2.
-// You can use this software according to the terms and conditions of the Mulan
-// PSL v2.
-// You may obtain a copy of Mulan PSL v2 at:
-//         http://license.coscl.org.cn/MulanPSL2
-// THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY
-// KIND, EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-// NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
-// See the Mulan PSL v2 for more details.
-
 use alloc::collections::BTreeMap;
 use alloc::string::String;
 use alloc::sync::{Arc, Weak};
@@ -19,10 +7,9 @@ use spin::Mutex;
 
 use crate::{
     config::{BRIDGE_CONTROL, BRIDGE_CTL_SEC_BUS_RESET, SECONDARY_BUS_NUM, SUBORDINATE_BUS_NUM},
-    PciDevOps,
-    msix::MsiIrqManager,
+    MsiIrqManager, PciDevOps,
 };
-use crate::errors::{PciResult as Result, PciError};
+use hypercraft::{HyperError, HyperResult as Result, PciError};
 
 type DeviceBusInfo = (Arc<Mutex<PciBus>>, Arc<Mutex<dyn PciDevOps>>);
 
@@ -46,10 +33,7 @@ impl PciBus {
     /// # Arguments
     ///
     /// * `name` - String name of pci bus.
-    pub fn new(
-        name: String,
-        msi_irq_manager: Option<Arc<dyn MsiIrqManager>>,
-    ) -> Self {
+    pub fn new(name: String, msi_irq_manager: Option<Arc<dyn MsiIrqManager>>) -> Self {
         Self {
             name,
             devices: BTreeMap::new(),
@@ -170,9 +154,12 @@ impl PciBus {
     /// * `dev` - Device attached to the bus.
     pub fn detach_device(bus: &Arc<Mutex<Self>>, dev: &Arc<Mutex<dyn PciDevOps>>) -> Result<()> {
         let mut dev_locked = dev.lock();
-        dev_locked
-            .unrealize()
-            .map_err(|_err| PciError::Other(format!("Failed to unrealize device {}", dev_locked.name())))?;
+        dev_locked.unrealize().map_err(|_err| {
+            HyperError::PciError(PciError::Other(format!(
+                "Failed to unrealize device {}",
+                dev_locked.name()
+            )))
+        })?;
 
         let devfn = dev_locked.pci_base().devfn;
         let mut locked_bus = bus.lock();
@@ -187,17 +174,15 @@ impl PciBus {
 
     pub fn reset(&mut self) -> Result<()> {
         for (_id, pci_dev) in self.devices.iter() {
-            pci_dev
-                .lock()
-                .reset(false)
-                .map_err(|_err| PciError::Other(format!("Fail to reset pci dev")))?;
+            pci_dev.lock().reset(false).map_err(|_err| {
+                HyperError::PciError(PciError::Other(format!("Fail to reset pci dev")))
+            })?;
         }
 
         for child_bus in self.child_buses.iter_mut() {
-            child_bus
-                .lock()
-                .reset()
-                .map_err(|_err| PciError::Other(format!("Fail to reset child bus")))?;
+            child_bus.lock().reset().map_err(|_err| {
+                HyperError::PciError(PciError::Other(format!("Fail to reset child bus")))
+            })?;
         }
 
         Ok(())

@@ -1,23 +1,43 @@
-pub mod device;
-pub mod error;
+// pub mod device;
 
 mod queue;
 mod transport;
 
-pub use device::block::{Block, BlockState, VirtioBlkConfig};
-pub use device::net::*;
-pub use device::serial::{find_port_by_nr, get_max_nr, Serial, SerialPort, VirtioSerialState};
-pub use error::VirtioError;
+// pub use device::block::{Block, BlockState, VirtioBlkConfig};
+// pub use device::net::*;
+// pub use device::serial::{find_port_by_nr, get_max_nr, Serial, SerialPort, VirtioSerialState};
 pub use queue::*;
 pub use transport::virtio_pci::VirtioPciDevice;
 
+use alloc::sync::Arc;
+use alloc::vec::Vec;
+use alloc::vec;
+use alloc::boxed::Box;
+use alloc::format;
+
 use core::cmp;
 use core::sync::atomic::{AtomicBool, AtomicU16, AtomicU32, AtomicU8, Ordering};
-use alloc::sync::Arc;
 use spin::Mutex;
 
 use pci::util::num_ops::{read_u32, write_u32};
+use pci::util::byte_code::ByteCode;
 use pci::util::AsAny;
+use pci::{
+    MsiIrqManager, MsiVector, MSI_ADDR_BASE, MSI_ADDR_DEST_FIELD_MASK, MSI_ADDR_DEST_MODE_MASK,
+};
+use hypercraft::{HyperResult as Result, HyperError, VirtioError};
+struct VirtioMsiIrqManager {}
+impl MsiIrqManager for VirtioMsiIrqManager {
+    fn trigger(&self, vector: MsiVector, dev_id: u32) -> Result<()> {
+        let msg_addr = vector.msi_addr;
+        let msg_data = vector.msi_data as u32;
+
+        // if msg_addr & MSI_ADDR_BASE {
+        //     // todo: send msix interrupt to lapic
+        // }
+        Ok(())
+    }
+}
 
 /// Check if the bit of features is configured.
 pub fn virtio_has_feature(feature: u64, fbit: u32) -> bool {
@@ -321,7 +341,7 @@ pub struct VirtioBase {
     broken: Arc<AtomicBool>,
 }
 
-#[derive(Copy, Clone, ByteCode)]
+#[derive(Copy, Clone)]
 struct VirtioBaseState {
     device_activated: bool,
     hfeatures_sel: u32,
@@ -388,7 +408,7 @@ impl VirtioBase {
             state.queues_config[index] = *queue;
         }
         for (index, queue) in self.queues.iter().enumerate() {
-            state.queues_config[index] = queue.lock().unwrap().vring.get_queue_config();
+            state.queues_config[index] = queue.lock().vring.get_queue_config();
             state.queue_num += 1;
         }
 
@@ -398,7 +418,6 @@ impl VirtioBase {
     fn set_state(
         &mut self,
         state: &VirtioBaseState,
-        mem_space: Arc<AddressSpace>,
         interrupt_cb: Arc<VirtioInterrupt>,
     ) {
         self.device_activated
@@ -425,7 +444,6 @@ impl VirtioBase {
         for queue_config in self.queues_config.iter_mut().take(state.queue_num) {
             if queue_config.ready {
                 queue_config.set_addr_cache(
-                    mem_space.clone(),
                     interrupt_cb.clone(),
                     self.driver_features,
                     &self.broken,
@@ -452,7 +470,8 @@ pub trait VirtioDevice: Send + AsAny {
 
     /// Unrealize low level device.
     fn unrealize(&mut self) -> Result<()> {
-        bail!("Unrealize of the virtio device is not implemented");
+        error!("Unrealize of the virtio device is not implemented");
+        Err(HyperError::BadState)
     }
 
     /// Get the virtio device type, refer to Virtio Spec.
@@ -602,7 +621,7 @@ pub trait VirtioDevice: Send + AsAny {
         let queue_select = self.virtio_base().queue_select;
         queues_config
             .get(queue_select as usize)
-            .with_context(|| "queue_select overflows")
+            .ok_or_else(|| HyperError::VirtioError(VirtioError::Other(format!("queue_select overflows"))))
     }
 
     /// Get mutable virtqueue config.
@@ -613,14 +632,14 @@ pub trait VirtioDevice: Send + AsAny {
                 CONFIG_STATUS_DRIVER_OK | CONFIG_STATUS_FAILED,
             )
         {
-            return Err(VirtioError::DevStatErr(self.device_status()));
+            return Err(HyperError::VirtioError(VirtioError::DevStatErr(self.device_status())));
         }
 
         let queue_select = self.virtio_base().queue_select;
         let queues_config = &mut self.virtio_base_mut().queues_config;
         return queues_config
             .get_mut(queue_select as usize)
-            .with_context(|| "queue_select overflows");
+            .ok_or_else(|| HyperError::VirtioError(VirtioError::Other(format!("queue_select overflows"))));
     }
 
     /// Get ISR register.
@@ -652,18 +671,17 @@ pub trait VirtioDevice: Send + AsAny {
     /// * `queue_evts` - The notifier events from guest.
     fn activate(
         &mut self,
-        mem_space: Arc<AddressSpace>,
         interrupt_cb: Arc<VirtioInterrupt>,
-        queue_evts: Vec<Arc<EventFd>>,
     ) -> Result<()>;
 
     /// Deactivate virtio device, this function remove event fd
     /// of device out of the event loop.
     fn deactivate(&mut self) -> Result<()> {
-        bail!(
+        error!(
             "Reset this device is not supported, virtio dev type is {}",
             self.device_type()
         );
+        Err(HyperError::BadState)
     }
 
     /// Reset virtio device, used to do some special reset action for
@@ -678,17 +696,9 @@ pub trait VirtioDevice: Send + AsAny {
     /// # Arguments
     ///
     /// * `_file_path` - The related backend file path.
-    fn update_config(&mut self, _dev_config: Option<Arc<dyn ConfigCheck>>) -> Result<()> {
-        bail!("Unsupported to update configuration")
-    }
-
-    /// Set guest notifiers for notifying the guest.
-    ///
-    /// # Arguments
-    ///
-    /// * `_queue_evts` - The notifier events from host.
-    fn set_guest_notifiers(&mut self, _queue_evts: &[Arc<EventFd>]) -> Result<()> {
-        Ok(())
+    fn update_config(&mut self) -> Result<()> {
+        error!("Unsupported to update configuration");
+        Err(HyperError::BadState)
     }
 
     /// Get whether the virtio device has a control queue,
@@ -705,7 +715,7 @@ fn check_config_space_rw(config: &[u8], offset: u64, data: &[u8]) -> Result<()> 
     offset
         .checked_add(data_len)
         .filter(|&end| end <= config_len)
-        .with_context(|| VirtioError::DevConfigOverflow(offset, data_len, config_len))?;
+        .ok_or_else(|| HyperError::VirtioError(VirtioError::DevConfigOverflow(offset, data_len, config_len)))?;
     Ok(())
 }
 
@@ -713,7 +723,7 @@ fn check_config_space_rw(config: &[u8], offset: u64, data: &[u8]) -> Result<()> 
 fn read_config_default(config: &[u8], offset: u64, mut data: &mut [u8]) -> Result<()> {
     check_config_space_rw(config, offset, data)?;
     let read_end = offset as usize + data.len();
-    data.write_all(&config[offset as usize..read_end])?;
+    data.copy_from_slice(&config[offset as usize..read_end]);
     Ok(())
 }
 
@@ -735,65 +745,65 @@ pub fn report_virtio_error(
     broken.store(true, Ordering::SeqCst);
 }
 
-/// Read iovec to buf and return the read number of bytes.
-pub fn iov_to_buf(mem_space: &AddressSpace, iovec: &[ElemIovec], buf: &mut [u8]) -> Result<usize> {
-    let mut start: usize = 0;
-    let mut end: usize = 0;
+// /// Read iovec to buf and return the read number of bytes.
+// pub fn iov_to_buf(mem_space: &AddressSpace, iovec: &[ElemIovec], buf: &mut [u8]) -> Result<usize> {
+//     let mut start: usize = 0;
+//     let mut end: usize = 0;
 
-    for iov in iovec {
-        let addr_map = mem_space.get_address_map(iov.addr, iov.len as u64)?;
-        for addr in addr_map.into_iter() {
-            end = cmp::min(start + addr.iov_len as usize, buf.len());
-            mem_to_buf(&mut buf[start..end], addr.iov_base)?;
-            if end >= buf.len() {
-                return Ok(end);
-            }
-            start = end;
-        }
-    }
-    Ok(end)
-}
+//     for iov in iovec {
+//         let addr_map = mem_space.get_address_map(iov.addr, iov.len as u64)?;
+//         for addr in addr_map.into_iter() {
+//             end = cmp::min(start + addr.iov_len as usize, buf.len());
+//             mem_to_buf(&mut buf[start..end], addr.iov_base)?;
+//             if end >= buf.len() {
+//                 return Ok(end);
+//             }
+//             start = end;
+//         }
+//     }
+//     Ok(end)
+// }
 
-/// Discard "size" bytes of the front of iovec.
-pub fn iov_discard_front(iovec: &mut [ElemIovec], mut size: u64) -> Option<&mut [ElemIovec]> {
-    for (index, iov) in iovec.iter_mut().enumerate() {
-        if iov.len as u64 > size {
-            iov.addr.0 += size;
-            iov.len -= size as u32;
-            return Some(&mut iovec[index..]);
-        }
-        size -= iov.len as u64;
-    }
-    None
-}
+// /// Discard "size" bytes of the front of iovec.
+// pub fn iov_discard_front(iovec: &mut [ElemIovec], mut size: u64) -> Option<&mut [ElemIovec]> {
+//     for (index, iov) in iovec.iter_mut().enumerate() {
+//         if iov.len as u64 > size {
+//             iov.addr.0 += size;
+//             iov.len -= size as u32;
+//             return Some(&mut iovec[index..]);
+//         }
+//         size -= iov.len as u64;
+//     }
+//     None
+// }
 
-/// Discard "size" bytes of the back of iovec.
-pub fn iov_discard_back(iovec: &mut [ElemIovec], mut size: u64) -> Option<&mut [ElemIovec]> {
-    let len = iovec.len();
-    for (index, iov) in iovec.iter_mut().rev().enumerate() {
-        if iov.len as u64 > size {
-            iov.len -= size as u32;
-            return Some(&mut iovec[..(len - index)]);
-        }
-        size -= iov.len as u64;
-    }
-    None
-}
+// /// Discard "size" bytes of the back of iovec.
+// pub fn iov_discard_back(iovec: &mut [ElemIovec], mut size: u64) -> Option<&mut [ElemIovec]> {
+//     let len = iovec.len();
+//     for (index, iov) in iovec.iter_mut().rev().enumerate() {
+//         if iov.len as u64 > size {
+//             iov.len -= size as u32;
+//             return Some(&mut iovec[..(len - index)]);
+//         }
+//         size -= iov.len as u64;
+//     }
+//     None
+// }
 
-/// Convert GPA buffer iovec to HVA buffer iovec.
-/// If don't need the entire iovec, use iov_discard_front/iov_discard_back firstly.
-fn gpa_hva_iovec_map(
-    gpa_elemiovec: &[ElemIovec],
-    mem_space: &AddressSpace,
-) -> Result<(u64, Vec<Iovec>)> {
-    let mut iov_size = 0;
-    let mut hva_iovec = Vec::new();
+// /// Convert GPA buffer iovec to HVA buffer iovec.
+// /// If don't need the entire iovec, use iov_discard_front/iov_discard_back firstly.
+// fn gpa_hva_iovec_map(
+//     gpa_elemiovec: &[ElemIovec],
+//     mem_space: &AddressSpace,
+// ) -> Result<(u64, Vec<Iovec>)> {
+//     let mut iov_size = 0;
+//     let mut hva_iovec = Vec::new();
 
-    for elem in gpa_elemiovec.iter() {
-        let mut hva_vec = mem_space.get_address_map(elem.addr, elem.len as u64)?;
-        hva_iovec.append(&mut hva_vec);
-        iov_size += elem.len as u64;
-    }
+//     for elem in gpa_elemiovec.iter() {
+//         let mut hva_vec = mem_space.get_address_map(elem.addr, elem.len as u64)?;
+//         hva_iovec.append(&mut hva_vec);
+//         iov_size += elem.len as u64;
+//     }
 
-    Ok((iov_size, hva_iovec))
-}
+//     Ok((iov_size, hva_iovec))
+// }

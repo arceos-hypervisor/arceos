@@ -1157,7 +1157,6 @@ impl VirtioDevice for Block {
         &mut self,
         mem_space: Arc<AddressSpace>,
         interrupt_cb: Arc<VirtioInterrupt>,
-        queue_evts: Vec<Arc<EventFd>>,
     ) -> Result<()> {
         self.interrupt_cb = Some(interrupt_cb.clone());
         let queues = self.base.queues.clone();

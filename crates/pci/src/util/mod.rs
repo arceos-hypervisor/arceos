@@ -1,7 +1,7 @@
 pub mod byte_code;
 pub mod num_ops;
 
-mod errors;
+pub mod errors;
 
 use core::any::Any;
 /// This trait is to cast trait object to struct.

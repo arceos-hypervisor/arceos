@@ -8,7 +8,9 @@ pub enum UtilError {
 impl core::fmt::Display for UtilError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
-            UtilError::NumOverflow { start, size } => write!(f, "range overflows: start {}, size {}", start, size),
+            UtilError::NumOverflow { start, size } => {
+                write!(f, "range overflows: start {}, size {}", start, size)
+            }
             UtilError::NumParseIntError {} => write!(f, "failed to parse integer"),
             UtilError::NumInvalid { num } => write!(f, "invalid number: {}", num),
         }
