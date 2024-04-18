@@ -27,7 +27,7 @@ impl PioOps for I8259Pic {
         }
     }
 
-    fn write(&mut self, port: u16, _access_size: u8, value: &[u8]) -> HyperResult {
+    fn write(&mut self, port: u16, _access_size: u8, value: u32) -> HyperResult {
         // debug!("writing to pic port {port:#x}: {value:#x}");
 
         let value = value as u8;

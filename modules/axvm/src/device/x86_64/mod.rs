@@ -100,14 +100,14 @@ impl<H: HyperCraftHal> DeviceList<H> {
         } else {
             let rax = vcpu.regs().rax;
             let value = match io_info.access_size {
-                1 => (rax as u8).to_le_bytes(),
-                2 => (rax as u16).to_le_bytes(),
-                4 => (rax as u32).to_le_bytes(),
+                1 => rax & 0xff,
+                2 => rax & 0xffff,
+                4 => rax,
                 _ => unreachable!(),
-            };
+            } as u32;
             device
                 .lock()
-                .write(io_info.port, io_info.access_size, &value)?;
+                .write(io_info.port, io_info.access_size, value)?;
         }
         vcpu.advance_rip(exit_info.exit_instruction_length as _)?;
         Ok(())
