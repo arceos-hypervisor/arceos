@@ -6,10 +6,13 @@ use core::sync::atomic::{AtomicU16, Ordering};
 use spin::Mutex;
 
 use crate::{
-    config::{BRIDGE_CONTROL, BRIDGE_CTL_SEC_BUS_RESET, SECONDARY_BUS_NUM, SUBORDINATE_BUS_NUM},
+    config::{BRIDGE_CONTROL, BRIDGE_CTL_SEC_BUS_RESET, SECONDARY_BUS_NUM, SUBORDINATE_BUS_NUM, Bar},
     MsiIrqManager, PciDevOps,
 };
-use hypercraft::{HyperError, HyperResult as Result, PciError};
+use hypercraft::{
+    HyperError, HyperResult as Result, PciError,
+    PioOps, MmioOps,
+};
 
 type DeviceBusInfo = (Arc<Mutex<PciBus>>, Arc<Mutex<dyn PciDevOps>>);
 
@@ -67,6 +70,32 @@ impl PciBus {
             return Some((*dev).clone());
         }
         debug!("Can't find device {}:{}", bus_num, devfn);
+        None
+    }
+
+    /// Get which bar is mapped to the io_info_port.
+    pub fn find_pio_bar(&self, port: u16) -> Option<Arc<Mutex<dyn PioOps>>> {
+        for device in self.devices.values() {
+            let device = device.lock();
+            let pci_dev_base = device.pci_base().clone();
+            let pci_config = &pci_dev_base.config;
+            if let Some(bar) = pci_config.find_pio(port) {
+                return Some(Arc::new(Mutex::new(bar.clone())));
+            } 
+        }
+        None
+    }
+
+    /// Get which bar is mapped to the mmio address.
+    pub fn find_mmio_bar(&self, address: u64) -> Option<Arc<Mutex<dyn MmioOps>>> {
+        for device in self.devices.values() {
+            let device = device.lock();
+            let pci_dev_base = device.pci_base().clone();
+            let pci_config = &pci_dev_base.config;
+            if let Some(bar) = pci_config.find_mmio(address) {
+                return Some(Arc::new(Mutex::new(bar.clone())));
+            }      
+        }
         None
     }
 

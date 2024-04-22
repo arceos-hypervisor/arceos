@@ -28,7 +28,7 @@ use byteorder::{ByteOrder, LittleEndian};
 
 use crate::config::{HEADER_TYPE, HEADER_TYPE_MULTIFUNC, MAX_FUNC};
 pub use crate::util::AsAny;
-use hypercraft::HyperResult as Result;
+use hypercraft::{HyperResult as Result, HyperError};
 
 // const BDF_FUNC_SHIFT: u8 = 3;
 pub const PCI_SLOT_MAX: u8 = 32;
@@ -42,47 +42,80 @@ pub const PCI_INTR_BASE: u8 = 32;
 // pub const OFFSET_MASK: u32 = 0x00fc;    // [7:2]
 
 /// Macros that write data in little endian.
+// macro_rules! le_write {
+//     ($name: ident, $func: ident, $type: tt) => {
+//         pub fn $name(buf: &mut [u8], offset: usize, data: $type) -> Result<()> {
+//             let data_len: usize = size_of::<$type>();
+//             let buf_len: usize = buf.len();
+//             if offset + data_len > buf_len {
+//                 error!(
+//                     "Out-of-bounds write access: buf_len = {}, offset = {}, data_len = {}",
+//                     buf_len, offset, data_len
+//                 );
+//             }
+//             LittleEndian::$func(&mut buf[offset..(offset + data_len)], data);
+//             Ok(())
+//         }
+//     };
+// }
+/// Macros that write data in little endian.
 macro_rules! le_write {
-    ($name: ident, $func: ident, $type: tt) => {
+    ($name: ident, $type: tt) => {
         pub fn $name(buf: &mut [u8], offset: usize, data: $type) -> Result<()> {
             let data_len: usize = size_of::<$type>();
             let buf_len: usize = buf.len();
             if offset + data_len > buf_len {
-                error!(
-                    "Out-of-bounds write access: buf_len = {}, offset = {}, data_len = {}",
-                    buf_len, offset, data_len
-                );
+                return Err(HyperError::InvalidParam);
             }
-            LittleEndian::$func(&mut buf[offset..(offset + data_len)], data);
+            for i in 0..data_len {
+                buf[offset + i] = (data >> (8 * i)) as u8;
+            }
             Ok(())
         }
     };
 }
 
-le_write!(le_write_u16, write_u16, u16);
-le_write!(le_write_u32, write_u32, u32);
-le_write!(le_write_u64, write_u64, u64);
+le_write!(le_write_u16, u16);
+le_write!(le_write_u32, u32);
+le_write!(le_write_u64, u64);
 
+// /// Macros that read data in little endian.
+// macro_rules! le_read {
+//     ($name: ident, $func: ident, $type: tt) => {
+//         pub fn $name(buf: &[u8], offset: usize) -> Result<$type> {
+//             let data_len: usize = size_of::<$type>();
+//             let buf_len: usize = buf.len();
+//             if offset + data_len > buf_len {
+//                 error!(
+//                     "Out-of-bounds read access: buf_len = {}, offset = {}, data_len = {}",
+//                     buf_len, offset, data_len
+//                 );
+//             }
+//             Ok(LittleEndian::$func(&buf[offset..(offset + data_len)]))
+//         }
+//     };
+// }
 /// Macros that read data in little endian.
 macro_rules! le_read {
-    ($name: ident, $func: ident, $type: tt) => {
+    ($name: ident, $type: tt) => {
         pub fn $name(buf: &[u8], offset: usize) -> Result<$type> {
             let data_len: usize = size_of::<$type>();
             let buf_len: usize = buf.len();
             if offset + data_len > buf_len {
-                error!(
-                    "Out-of-bounds read access: buf_len = {}, offset = {}, data_len = {}",
-                    buf_len, offset, data_len
-                );
+                return Err(HyperError::InvalidParam);
             }
-            Ok(LittleEndian::$func(&buf[offset..(offset + data_len)]))
+            let mut res: $type = 0;
+            for i in 0..data_len {
+                res |= (buf[offset + i] as $type) << (8 * i);
+            }
+            Ok(res)
         }
     };
 }
 
-le_read!(le_read_u16, read_u16, u16);
-le_read!(le_read_u32, read_u32, u32);
-le_read!(le_read_u64, read_u64, u64);
+le_read!(le_read_u16, u16);
+le_read!(le_read_u32, u32);
+le_read!(le_read_u64, u64);
 
 // fn le_write_set_value_u16(buf: &mut [u8], offset: usize, data: u16) -> Result<()> {
 //     let val = le_read_u16(buf, offset)?;

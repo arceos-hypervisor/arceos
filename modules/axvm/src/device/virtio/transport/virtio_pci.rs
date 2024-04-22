@@ -917,7 +917,7 @@ impl PciDevOps for VirtioPciDevice {
             mem_region_size,
         )?;
 
-        // Register device to pci bus.
+        // Register device to pci bus. Now set it to the root bus.
         let pci_bus = dev.lock().base.parent_bus.upgrade().unwrap();
         let mut locked_pci_bus = pci_bus.lock();
         let pci_device = locked_pci_bus.devices.get(&devfn);

@@ -889,6 +889,13 @@ impl PciConfig {
         }
     }
 
+    /// Find a PIO BAR by Port.
+    pub fn find_pio(&self, port: u16) -> Option<&Bar> {
+        self.bars
+        .iter()
+        .find(|bar| bar.port_range().contains(&port))
+    }
+    
     /// Add a new MMIO BAR to the configuration space.
     pub fn add_mmio(&mut self, range: Range<u64>, mmio: Arc<Mutex<dyn MmioOps>>) {
         self.mmios.insert(range, mmio);
@@ -900,6 +907,14 @@ impl PciConfig {
             self.mmios.remove(&range);
         }
     }
+    
+    /// Find a MMIO BAR by Address.
+    pub fn find_mmio(&self, addr: u64) -> Option<&Bar> {
+        self.bars
+        .iter()
+        .find(|bar| bar.mmio_range().contains(&addr))
+    }
+    
     /// Add a pci standard capability in the configuration space.
     ///
     /// # Arguments

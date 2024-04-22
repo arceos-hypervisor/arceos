@@ -7,13 +7,21 @@ use crate::{
 };
 use crate::{Error as HyperError, VmExitInfo as VmxExitInfo};
 use alloc::{sync::Arc, vec, vec::Vec};
+use alloc::string::String;
 use axhal::{current_cpu_id, mem::phys_to_virt};
 use bit_field::BitField;
+use pci::{PciHost, PciDevOps, AsAny};
 use core::marker::PhantomData;
 use spin::Mutex;
+use core::any::Any;
 
 use device_emu::{ApicBaseMsrHandler, Bundle, VirtLocalApic};
-use hypercraft::{PioOps, VirtMsrOps};
+use hypercraft::{MmioOps, PioOps, VirtMsrOps};
+
+use super::virtio::{
+    VirtioPciDevice, VirtioMsiIrqManager, VirtioDevice, DummyVirtioDevice,
+    VIRTIO_TYPE_BLOCK,
+};
 
 const VM_EXIT_INSTR_LEN_RDMSR: u8 = 2;
 const VM_EXIT_INSTR_LEN_WRMSR: u8 = 2;
@@ -21,7 +29,9 @@ const VM_EXIT_INSTR_LEN_VMCALL: u8 = 3;
 
 pub struct DeviceList<H: HyperCraftHal> {
     port_io_devices: Vec<Arc<Mutex<dyn PioOps>>>,
+    memory_io_devices: Vec<Arc<Mutex<dyn MmioOps>>>,
     msr_devices: Vec<Arc<Mutex<dyn VirtMsrOps>>>,
+    pci_devices: Option<Arc<Mutex<PciHost>>>,
     marker: core::marker::PhantomData<H>,
 }
 
@@ -29,9 +39,37 @@ impl<H: HyperCraftHal> DeviceList<H> {
     pub fn new() -> Self {
         Self {
             port_io_devices: vec![],
+            memory_io_devices: vec![],
             msr_devices: vec![],
+            pci_devices: None,
             marker: core::marker::PhantomData,
         }
+    }
+
+    fn init_pci_host(&mut self) {
+        let pci_host = PciHost::new(Some(Arc::new(super::virtio::VirtioMsiIrqManager{})));
+        self.pci_devices = Some(Arc::new(Mutex::new(pci_host)));
+    }
+
+    // virtio pci devfn: 0x18 bus: 0x0.
+    fn add_virtio_pci_device(
+        &mut self,
+        name: String,
+        devfn: u8,
+        device: Arc<Mutex<dyn VirtioDevice>>,
+        multi_func: bool,
+    ) -> HyperResult<()>{
+        let mut pci_host = self.pci_devices.clone().unwrap();
+        let pci_bus = pci_host.lock().root_bus.clone();
+        let parent_bus = Arc::downgrade(&pci_bus);
+        let mut pcidev = VirtioPciDevice::new(
+            name,
+            devfn,
+            device,
+            parent_bus,
+            multi_func,
+        );
+        pcidev.realize()
     }
 
     pub fn add_port_io_device(&mut self, device: Arc<Mutex<dyn PioOps>>) {
@@ -46,6 +84,20 @@ impl<H: HyperCraftHal> DeviceList<H> {
         self.port_io_devices
             .iter()
             .find(|dev| dev.lock().port_range().contains(&port))
+    }
+
+    pub fn add_memory_io_device(&mut self, device: Arc<Mutex<dyn MmioOps>>) {
+        self.memory_io_devices.push(device)
+    }
+
+    pub fn add_memory_io_devices(&mut self, devices: &mut Vec<Arc<Mutex<dyn MmioOps>>>) {
+        self.memory_io_devices.append(devices)
+    }
+
+    pub fn find_memory_io_device(&self, address: u64) -> Option<&Arc<Mutex<dyn MmioOps>>> {
+        self.memory_io_devices
+            .iter()
+            .find(|dev| dev.lock().mmio_range().contains(&address))
     }
 
     pub fn add_msr_device(&mut self, device: Arc<Mutex<dyn VirtMsrOps>>) {
@@ -123,12 +175,59 @@ impl<H: HyperCraftHal> DeviceList<H> {
         if let Some(dev) = self.find_port_io_device(io_info.port) {
             return Some(Self::handle_io_instruction_to_device(vcpu, exit_info, dev));
         } else {
+            if self.pci_devices.is_some() {
+                let pci_host = self.pci_devices.clone().unwrap();
+                let mut root_bus = &pci_host.lock().root_bus;
+                if let Some(bar) = root_bus.clone().lock().find_pio_bar(io_info.port) {
+                    return Some(Self::handle_io_instruction_to_device(vcpu, exit_info, &bar));
+                }
+            }
             return None;
-            // panic!(
-            //     "Unsupported I/O port {:#x} access: {:#x?}\n, vcpu: {:#x?}",
-            //     io_info.port, io_info, vcpu
-            // )
         }
+    }
+
+    fn handle_mmio_instruction_to_device(
+        vcpu: &mut VCpu<H>,
+        exit_info: &VmxExitInfo,
+        device: &Arc<Mutex<dyn MmioOps>>,
+    )-> HyperResult {
+        Ok(())
+    }
+
+    pub fn handle_mmio_instruction(
+        &mut self,
+        vcpu: &mut VCpu<H>,
+        exit_info: &VmxExitInfo,
+    ) -> Option<HyperResult> {
+        // match vcpu.nested_page_fault_info() {
+        //     Ok(fault_info) =>  {
+        //         debug!(
+        //             "VM exit: EPT violation @ {:#x}, fault_paddr={:#x}, access_flags=({:?}), vcpu: {:#x?}",
+        //             exit_info.guest_rip, fault_info.fault_guest_paddr, fault_info.access_flags, vcpu
+        //         );
+        //         // todo: get mmio info
+        //         let mmio_info = vcpu.io_exit_info().unwrap();
+
+        //         if let Some(dev) = self.find_memory_io_device() {
+        //             return Some(Self::handle_mmio_instruction_to_device(vcpu, exit_info, dev));
+        //         } else {
+        //             if self.pci_devices.is_some() {
+        //                 let pci_host = self.pci_devices.clone().unwrap();
+        //                 let mut root_bus = pci_host.lock().root_bus.clone();
+        //                 if let Some(bar) = root_bus.find_mmio_bar() {
+        //                     return Some(Self::handle_mmio_instruction_to_device(vcpu, exit_info, dev));
+        //                 }
+        //             }
+        //             return None;
+        //         }
+        //         Some(Ok(()))
+        //     }
+        //     Err(_err) => panic!(
+        //         "VM exit: EPT violation with unknown fault info @ {:#x}, vcpu: {:#x?}",
+        //         exit_info.guest_rip, vcpu
+        //     ),
+        // }
+        None
     }
 
     pub fn handle_msr_read(&mut self, vcpu: &mut VCpu<H>) -> HyperResult {
@@ -338,7 +437,19 @@ impl<H: HyperCraftHal> X64VmDevices<H> {
 
 impl<H: HyperCraftHal> PerVmDevices<H> for X64VmDevices<H> {
     fn new() -> HyperResult<Self> {
-        let devices = DeviceList::new();
+        let mut devices = DeviceList::new();
+        // init pci device
+        devices.init_pci_host();
+        devices.add_port_io_device(devices.pci_devices.clone().unwrap());
+        // Create a virtio dummy device
+        let virtio_device_dummy = DummyVirtioDevice::new(VIRTIO_TYPE_BLOCK, 1, 4);
+        devices.add_virtio_pci_device(
+            String::from("virtio_blk_dummy"),
+            0x18,
+            Arc::new(Mutex::new(virtio_device_dummy)),
+            false,
+        )?;
+
         Ok(Self {
             marker: PhantomData,
             devices,
@@ -352,18 +463,7 @@ impl<H: HyperCraftHal> PerVmDevices<H> for X64VmDevices<H> {
     ) -> Option<HyperResult> {
         match exit_info.exit_reason {
             VmxExitReason::EXTERNAL_INTERRUPT => Some(Self::handle_external_interrupt(vcpu)),
-            VmxExitReason::EPT_VIOLATION => {
-                match vcpu.nested_page_fault_info() {
-                    Ok(fault_info) => panic!(
-                        "VM exit: EPT violation @ {:#x}, fault_paddr={:#x}, access_flags=({:?}), vcpu: {:#x?}",
-                        exit_info.guest_rip, fault_info.fault_guest_paddr, fault_info.access_flags, vcpu
-                    ),
-                    Err(_err) => panic!(
-                        "VM exit: EPT violation with unknown fault info @ {:#x}, vcpu: {:#x?}",
-                        exit_info.guest_rip, vcpu
-                    ),
-                }
-            },
+            VmxExitReason::EPT_VIOLATION => self.devices.handle_mmio_instruction(vcpu, exit_info),
             VmxExitReason::IO_INSTRUCTION => self.devices.handle_io_instruction(vcpu, exit_info),
             VmxExitReason::MSR_READ => Some(self.devices.handle_msr_read(vcpu)),
             VmxExitReason::MSR_WRITE => Some(self.devices.handle_msr_write(vcpu)),
