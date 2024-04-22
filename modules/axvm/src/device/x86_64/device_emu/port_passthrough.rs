@@ -27,7 +27,7 @@ impl PioOps for PortPassthrough {
         }
     }
 
-    fn write(&mut self, port: u16, access_size: u8, value: u32) -> HyperResult {
+    fn write(&mut self, port: u16, access_size: u8, value: &[u8]) -> HyperResult {
         match access_size {
             1 => Ok(unsafe { io::outb(port, value as u8) }),
             2 => Ok(unsafe { io::outw(port, value as u16) }),

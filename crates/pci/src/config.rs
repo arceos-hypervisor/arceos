@@ -585,12 +585,6 @@ impl PciConfig {
                     format!("offset {} with len {}", offset, data.len()),
                 ))
             })?;
-
-        Ok(())
-    }
-
-    /// Common writing to configuration space.
-    ///
     /// # Arguments
     ///
     /// * `offset` - Offset in the configuration space from which to write.

@@ -68,7 +68,6 @@ pub struct Msix {
     pub dev_id: Arc<AtomicU16>,
     pub msi_irq_manager: Option<Arc<dyn MsiIrqManager>>,
 }
-
 impl Msix {
     /// Construct a new MSI-X structure.
     ///
