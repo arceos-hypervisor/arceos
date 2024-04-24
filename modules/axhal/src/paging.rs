@@ -27,6 +27,7 @@ impl From<MemRegionFlags> for MappingFlags {
     }
 }
 
+#[derive(Clone)]
 /// Implementation of [`PagingIf`], to provide physical memory manipulation to
 /// the [page_table] crate.
 pub struct PagingIfImpl;

@@ -7,7 +7,9 @@ use hypercraft::{PerCpu, VCpu, VmCpus, VM};
 use super::arch::new_vcpu;
 #[cfg(target_arch = "x86_64")]
 use super::device::{self, X64VcpuDevices, X64VmDevices};
-use crate::{phys_to_virt, PhysAddr};
+use crate::mm::get_gva_content_bytes;
+use crate::GuestPageTable;
+use alloc::sync::Arc;
 use axhal::hv::HyperCraftHalImpl;
 use axhal::mem::PAGE_SIZE_4K;
 
@@ -37,6 +39,7 @@ pub fn config_boot_linux(hart_id: usize, linux_context: &LinuxContext) {
         super::config::root_gpm()
     );
 
+    let ept = super::config::root_gpm().nest_page_table();
     let ept_root = super::config::root_gpm().nest_page_table_root();
 
     let vcpu = new_vcpu(
@@ -53,7 +56,8 @@ pub fn config_boot_linux(hart_id: usize, linux_context: &LinuxContext) {
         HyperCraftHalImpl,
         X64VcpuDevices<HyperCraftHalImpl>,
         X64VmDevices<HyperCraftHalImpl>,
-    >::new(vcpus);
+        GuestPageTable,
+    >::new(vcpus, Arc::new(ept));
     // The bind_vcpu method should be decoupled with vm struct.
     vm.bind_vcpu(hart_id).expect("bind vcpu failed");
 
@@ -83,15 +87,15 @@ pub fn boot_vm(vm_id: usize) {
         .generate_guest_phys_memory_set()
         .expect("Failed to generate GPM");
 
-    let npt = gpm.nest_page_table_root();
+    let npt = gpm.nest_page_table();
+    let npt_root = gpm.nest_page_table_root();
     info!("{:#x?}", gpm);
-
     // Main scheduling item, managed by `axtask`
     let vcpu = VCpu::new_nimbos(
         0,
         crate::arch::cpu_vmcs_revision_id(),
         vm_cfg_entry.get_vm_entry(),
-        npt,
+        npt_root,
     )
     .unwrap();
     let mut vcpus = VmCpus::<HyperCraftHalImpl, X64VcpuDevices<HyperCraftHalImpl>>::new();
@@ -100,7 +104,8 @@ pub fn boot_vm(vm_id: usize) {
         HyperCraftHalImpl,
         X64VcpuDevices<HyperCraftHalImpl>,
         X64VmDevices<HyperCraftHalImpl>,
-    >::new(vcpus);
+        GuestPageTable,
+    >::new(vcpus, Arc::new(npt));
     // The bind_vcpu method should be decoupled with vm struct.
     vm.bind_vcpu(0).expect("bind vcpu failed");
 

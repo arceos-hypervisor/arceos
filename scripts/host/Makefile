@@ -30,7 +30,7 @@ image: $(qemu_image)
 	EOF
 	cloud-localds user-data.img user-data
 	qemu-img resize $(qemu_image) +64G
-	sudo $(QEMU) $(qemu_args) -drive file=user-data.img,format=raw
+	$(QEMU) $(qemu_args) -drive file=user-data.img,format=raw
 
 echo_workspace:
 	echo ${WORKSPACE}

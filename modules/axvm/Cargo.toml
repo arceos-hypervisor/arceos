@@ -39,6 +39,12 @@ memory_addr = { path = "../../crates/memory_addr" }
 page_table_entry = { path = "../../crates/page_table_entry", features = ["hv"] }
 pci = { path = "../../crates/pci" }
 
+[dependencies.iced-x86]
+version = "1.21.0"
+default-features = false
+# See below for all features
+features = ["no_std", "decoder", "masm", "instr_info"]
+
 [target.'cfg(target_arch = "x86_64")'.dependencies]
 x86 = "0.52"
 x86_64 = "0.14"

@@ -26,6 +26,7 @@ const fn p1_index(vaddr: VirtAddr) -> usize {
     (vaddr.as_usize() >> 12) & (ENTRY_COUNT - 1)
 }
 
+#[derive(Clone)]
 /// A generic page table struct for 64-bit platform.
 ///
 /// It also tracks all intermediate level tables. They will be deallocated

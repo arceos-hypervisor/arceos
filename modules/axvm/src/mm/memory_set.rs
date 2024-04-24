@@ -1,5 +1,8 @@
 use alloc::collections::BTreeMap;
-use core::{clone, fmt::{Debug, Display, Formatter, Result}};
+use core::{
+    clone,
+    fmt::{Debug, Display, Formatter, Result},
+};
 
 use hypercraft::{GuestPageTableTrait, GuestPhysAddr, HostPhysAddr, HyperCraftHal};
 
@@ -126,9 +129,13 @@ pub struct GuestPhysMemorySet {
 impl GuestPhysMemorySet {
     pub fn new() -> HyperResult<Self> {
         Ok(Self {
-            npt: GuestPageTable::new()?,
+            npt: (GuestPageTable::new()?),
             regions: BTreeMap::new(),
         })
+    }
+
+    pub fn nest_page_table(&self) -> GuestPageTable {
+        self.npt.clone()
     }
 
     pub fn nest_page_table_root(&self) -> HostPhysAddr {

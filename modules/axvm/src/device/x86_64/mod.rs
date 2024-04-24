@@ -5,22 +5,23 @@ use crate::{
     nmi::NmiMessage, nmi::CPU_NMI_LIST, HyperCraftHal, PerCpuDevices, PerVmDevices,
     Result as HyperResult, VCpu, VmExitInfo, VmxExitReason,
 };
-use crate::{Error as HyperError, VmExitInfo as VmxExitInfo};
-use alloc::{sync::Arc, vec, vec::Vec};
+use crate::{Error as HyperError, GuestPageTable, VmExitInfo as VmxExitInfo};
 use alloc::string::String;
+use alloc::{sync::Arc, vec, vec::Vec};
 use axhal::{current_cpu_id, mem::phys_to_virt};
 use bit_field::BitField;
-use pci::{PciHost, PciDevOps, AsAny};
-use core::marker::PhantomData;
-use spin::Mutex;
 use core::any::Any;
+use core::marker::PhantomData;
+use iced_x86::{Code, Instruction, OpKind, Register};
+use page_table_entry::MappingFlags;
+use pci::{AsAny, PciDevOps, PciHost};
+use spin::Mutex;
 
 use device_emu::{ApicBaseMsrHandler, Bundle, VirtLocalApic};
-use hypercraft::{MmioOps, PioOps, VirtMsrOps};
+use hypercraft::{GuestPageTableTrait, MmioOps, PioOps, VirtMsrOps};
 
 use super::virtio::{
-    VirtioPciDevice, VirtioMsiIrqManager, VirtioDevice, DummyVirtioDevice,
-    VIRTIO_TYPE_BLOCK,
+    DummyVirtioDevice, VirtioDevice, VirtioMsiIrqManager, VirtioPciDevice, VIRTIO_TYPE_BLOCK,
 };
 
 const VM_EXIT_INSTR_LEN_RDMSR: u8 = 2;
@@ -47,7 +48,7 @@ impl<H: HyperCraftHal> DeviceList<H> {
     }
 
     fn init_pci_host(&mut self) {
-        let pci_host = PciHost::new(Some(Arc::new(super::virtio::VirtioMsiIrqManager{})));
+        let pci_host = PciHost::new(Some(Arc::new(super::virtio::VirtioMsiIrqManager {})));
         self.pci_devices = Some(Arc::new(Mutex::new(pci_host)));
     }
 
@@ -58,17 +59,11 @@ impl<H: HyperCraftHal> DeviceList<H> {
         devfn: u8,
         device: Arc<Mutex<dyn VirtioDevice>>,
         multi_func: bool,
-    ) -> HyperResult<()>{
+    ) -> HyperResult<()> {
         let mut pci_host = self.pci_devices.clone().unwrap();
         let pci_bus = pci_host.lock().root_bus.clone();
         let parent_bus = Arc::downgrade(&pci_bus);
-        let mut pcidev = VirtioPciDevice::new(
-            name,
-            devfn,
-            device,
-            parent_bus,
-            multi_func,
-        );
+        let mut pcidev = VirtioPciDevice::new(name, devfn, device, parent_bus, multi_func);
         pcidev.realize()
     }
 
@@ -190,7 +185,7 @@ impl<H: HyperCraftHal> DeviceList<H> {
         vcpu: &mut VCpu<H>,
         exit_info: &VmxExitInfo,
         device: &Arc<Mutex<dyn MmioOps>>,
-    )-> HyperResult {
+    ) -> HyperResult {
         Ok(())
     }
 
@@ -198,7 +193,28 @@ impl<H: HyperCraftHal> DeviceList<H> {
         &mut self,
         vcpu: &mut VCpu<H>,
         exit_info: &VmxExitInfo,
+        instr: Option<Instruction>,
     ) -> Option<HyperResult> {
+        if let Some(instr) = instr {
+            if let ept_info = vcpu
+                .nested_page_fault_info()
+                .expect("Failed to get nested page fault info")
+            {
+                let is_write = ept_info.access_flags.contains(MappingFlags::WRITE);
+                let fault_addr = ept_info.fault_guest_paddr;
+                let access_size =
+                    get_access_size(instr.clone()).expect("Failed to get access size");
+                return None;
+            } else {
+                panic!(
+                    "VM exit: EPT violation with unknown fault info @ {:#x}, vcpu: {:#x?}",
+                    exit_info.guest_rip, vcpu
+                );
+            }
+        } else {
+            return None;
+        }
+
         // match vcpu.nested_page_fault_info() {
         //     Ok(fault_info) =>  {
         //         debug!(
@@ -380,7 +396,10 @@ impl<H: HyperCraftHal> PerCpuDevices<H> for X64VcpuDevices<H> {
                 Ok(0)
             }
             None => {
-                warn!("Core [{}] unexpected NMI, something very bad happened", current_cpu_id);
+                warn!(
+                    "Core [{}] unexpected NMI, something very bad happened",
+                    current_cpu_id
+                );
                 warn!("VCPU ctx:\n{:?}", vcpu);
                 Err(HyperError::BadState)
             }
@@ -460,14 +479,56 @@ impl<H: HyperCraftHal> PerVmDevices<H> for X64VmDevices<H> {
         &mut self,
         vcpu: &mut VCpu<H>,
         exit_info: &VmExitInfo,
+        instr: Option<Instruction>,
     ) -> Option<HyperResult> {
         match exit_info.exit_reason {
             VmxExitReason::EXTERNAL_INTERRUPT => Some(Self::handle_external_interrupt(vcpu)),
-            VmxExitReason::EPT_VIOLATION => self.devices.handle_mmio_instruction(vcpu, exit_info),
+            VmxExitReason::EPT_VIOLATION => {
+                self.devices.handle_mmio_instruction(vcpu, exit_info, instr)
+            }
             VmxExitReason::IO_INSTRUCTION => self.devices.handle_io_instruction(vcpu, exit_info),
             VmxExitReason::MSR_READ => Some(self.devices.handle_msr_read(vcpu)),
             VmxExitReason::MSR_WRITE => Some(self.devices.handle_msr_write(vcpu)),
             _ => None,
         }
     }
+}
+
+fn get_access_size(instruction: Instruction) -> HyperResult<u8> {
+    match instruction.code() {
+        Code::INVALID => Err(HyperError::DecodeError),
+        _ => {
+            let size = match (
+                instruction.op0_kind(),
+                instruction.op1_kind(),
+                instruction.op2_kind(),
+            ) {
+                (OpKind::Register, _, _) | (_, OpKind::Register, _) | (_, _, OpKind::Register) => {
+                    instruction.op_register(0).size()
+                }
+                (OpKind::Memory, _, _) | (_, OpKind::Memory, _) | (_, _, OpKind::Memory) => {
+                    instruction.memory_size().size()
+                }
+                (OpKind::Immediate8, _, _)
+                | (_, OpKind::Immediate8, _)
+                | (_, _, OpKind::Immediate8) => 1,
+                (OpKind::Immediate16, _, _)
+                | (_, OpKind::Immediate16, _)
+                | (_, _, OpKind::Immediate16) => 2,
+                (OpKind::Immediate32, _, _)
+                | (_, OpKind::Immediate32, _)
+                | (_, _, OpKind::Immediate32) => 4,
+                (OpKind::Immediate64, _, _)
+                | (_, OpKind::Immediate64, _)
+                | (_, _, OpKind::Immediate64) => 8,
+                _ => 0,
+            };
+            Ok(size as u8)
+        }
+    }
+}
+
+fn get_write_data(instruction: Instruction) -> HyperResult<u64> {
+    // TODO
+    Ok(0)
 }
