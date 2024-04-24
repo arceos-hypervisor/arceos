@@ -358,6 +358,7 @@ dependencies = [
  "axconfig",
  "axfs_ramfs",
  "axlog",
+ "bit_field",
  "bitflags 2.4.1",
  "cfg-if",
  "crate_interface 0.1.1",
@@ -1578,6 +1579,7 @@ checksum = "de3145af08024dea9fa9914f381a17b8fc6034dfb00f3a84013f7ff43f29ed4c"
 name = "pci"
 version = "0.1.0"
 dependencies = [
+ "bit_field",
  "byteorder",
  "hashbrown 0.14.3",
  "hypercraft",

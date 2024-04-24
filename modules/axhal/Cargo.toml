@@ -19,11 +19,13 @@ platform-pc-x86 = ["axconfig/platform-pc-x86", "dep:ratio"]
 platform-qemu-virt-riscv = ["axconfig/platform-qemu-virt-riscv"]
 platform-qemu-virt-aarch64 = [
     "axconfig/platform-qemu-virt-aarch64",
-    "dep:page_table_entry", "dep:ratio",
+    "dep:page_table_entry",
+    "dep:ratio",
 ]
 platform-raspi4-aarch64 = [
     "axconfig/platform-raspi4-aarch64",
-    "dep:page_table_entry", "dep:ratio",
+    "dep:page_table_entry",
+    "dep:ratio",
 ]
 default = []
 hv = ["paging", "platform-qemu-virt-aarch64", "axconfig/hv"]
@@ -56,6 +58,7 @@ x86_64 = "0.14"
 x2apic = "0.4"
 raw-cpuid = "11.0"
 memoffset = { version = ">=0.6.5", features = ["unstable_const"] }
+bit_field = "0.10"
 
 [target.'cfg(any(target_arch = "riscv32", target_arch = "riscv64"))'.dependencies]
 riscv = "0.10"

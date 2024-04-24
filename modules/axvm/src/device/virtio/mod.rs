@@ -10,32 +10,38 @@ pub use crate::device::virtio::device::dummy::DummyVirtioDevice;
 pub use queue::*;
 pub use transport::virtio_pci::VirtioPciDevice;
 
-use alloc::sync::Arc;
-use alloc::vec::Vec;
-use alloc::vec;
 use alloc::boxed::Box;
 use alloc::format;
+use alloc::sync::Arc;
+use alloc::vec;
+use alloc::vec::Vec;
 
 use core::cmp;
 use core::sync::atomic::{AtomicBool, AtomicU16, AtomicU32, AtomicU8, Ordering};
 use spin::Mutex;
+use x86::msr::{rdmsr, wrmsr, IA32_X2APIC_ICR};
 
-use pci::util::num_ops::{read_u32, write_u32};
+use axhal::irq::ApicIcr;
+use hypercraft::{HyperError, HyperResult as Result, VirtioError};
 use pci::util::byte_code::ByteCode;
+use pci::util::num_ops::{read_u32, write_u32};
 use pci::util::AsAny;
-use pci::{
-    MsiIrqManager, MsiVector, MSI_ADDR_BASE, MSI_ADDR_DEST_FIELD_MASK, MSI_ADDR_DEST_MODE_MASK,
-};
-use hypercraft::{HyperResult as Result, HyperError, VirtioError};
+use pci::{MsiAddrReg, MsiDataReg, MsiIrqManager, MsiVector, MSI_ADDR_BASE};
 pub struct VirtioMsiIrqManager {}
 impl MsiIrqManager for VirtioMsiIrqManager {
     fn trigger(&self, vector: MsiVector, dev_id: u32) -> Result<()> {
-        let msg_addr = vector.msi_addr;
-        let msg_data = vector.msi_data as u32;
-
-        // if msg_addr & MSI_ADDR_BASE {
-        //     // todo: send msix interrupt to lapic
-        // }
+        debug!("Trigger MSI: {:#?}", vector);
+        let msi_addr_reg: MsiAddrReg = vector.msi_addr.into();
+        if msi_addr_reg.addr_base() == MSI_ADDR_BASE {
+            let msi_data_reg: MsiDataReg = (vector.msi_data as u32).into();
+            // todo: just let the vcpu id is equal to pcpu id and send it to the only corresponding pcpu?
+            let vdest = msi_addr_reg.dest_field();
+            let mut icr = ApicIcr::new(0);
+            icr.set_dest_field(vdest);
+            icr.set_vector(msi_data_reg.vector());
+            icr.set_delivery_mode(msi_data_reg.delivery_mode());
+            unsafe { wrmsr(IA32_X2APIC_ICR, icr.value()) };
+        }
         Ok(())
     }
 }
@@ -416,11 +422,7 @@ impl VirtioBase {
         state
     }
 
-    fn set_state(
-        &mut self,
-        state: &VirtioBaseState,
-        interrupt_cb: Arc<VirtioInterrupt>,
-    ) {
+    fn set_state(&mut self, state: &VirtioBaseState, interrupt_cb: Arc<VirtioInterrupt>) {
         self.device_activated
             .store(state.device_activated, Ordering::SeqCst);
         self.hfeatures_sel = state.hfeatures_sel;
@@ -620,9 +622,9 @@ pub trait VirtioDevice: Send + AsAny {
     fn queue_config(&self) -> Result<&QueueConfig> {
         let queues_config = &self.virtio_base().queues_config;
         let queue_select = self.virtio_base().queue_select;
-        queues_config
-            .get(queue_select as usize)
-            .ok_or_else(|| HyperError::VirtioError(VirtioError::Other(format!("queue_select overflows"))))
+        queues_config.get(queue_select as usize).ok_or_else(|| {
+            HyperError::VirtioError(VirtioError::Other(format!("queue_select overflows")))
+        })
     }
 
     /// Get mutable virtqueue config.
@@ -633,14 +635,16 @@ pub trait VirtioDevice: Send + AsAny {
                 CONFIG_STATUS_DRIVER_OK | CONFIG_STATUS_FAILED,
             )
         {
-            return Err(HyperError::VirtioError(VirtioError::DevStatErr(self.device_status())));
+            return Err(HyperError::VirtioError(VirtioError::DevStatErr(
+                self.device_status(),
+            )));
         }
 
         let queue_select = self.virtio_base().queue_select;
         let queues_config = &mut self.virtio_base_mut().queues_config;
-        return queues_config
-            .get_mut(queue_select as usize)
-            .ok_or_else(|| HyperError::VirtioError(VirtioError::Other(format!("queue_select overflows"))));
+        return queues_config.get_mut(queue_select as usize).ok_or_else(|| {
+            HyperError::VirtioError(VirtioError::Other(format!("queue_select overflows")))
+        });
     }
 
     /// Get ISR register.
@@ -670,10 +674,7 @@ pub trait VirtioDevice: Send + AsAny {
     /// * `interrupt_cb` - The callback used to send interrupt to guest.
     /// * `queues` - The virtio queues.
     /// * `queue_evts` - The notifier events from guest.
-    fn activate(
-        &mut self,
-        interrupt_cb: Arc<VirtioInterrupt>,
-    ) -> Result<()>;
+    fn activate(&mut self, interrupt_cb: Arc<VirtioInterrupt>) -> Result<()>;
 
     /// Deactivate virtio device, this function remove event fd
     /// of device out of the event loop.
@@ -716,7 +717,9 @@ fn check_config_space_rw(config: &[u8], offset: u64, data: &[u8]) -> Result<()> 
     offset
         .checked_add(data_len)
         .filter(|&end| end <= config_len)
-        .ok_or_else(|| HyperError::VirtioError(VirtioError::DevConfigOverflow(offset, data_len, config_len)))?;
+        .ok_or_else(|| {
+            HyperError::VirtioError(VirtioError::DevConfigOverflow(offset, data_len, config_len))
+        })?;
     Ok(())
 }
 

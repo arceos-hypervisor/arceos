@@ -1,5 +1,6 @@
 use alloc::sync::Arc;
 use alloc::vec::Vec;
+use bit_field::BitField;
 use core::cmp::max;
 use core::sync::atomic::{AtomicU16, Ordering};
 use spin::Mutex;
@@ -24,13 +25,8 @@ pub const MSIX_CAP_FUNC_MASK: u16 = 0x4000;
 pub const MSIX_CAP_SIZE: u8 = 12;
 pub const MSIX_CAP_ID: u8 = 0x11;
 pub const MSIX_CAP_TABLE: u8 = 0x04;
-pub const MSI_ADDR_BASE: u64 = 0xfee0_0000;
-
-pub const MSI_ADDR_DEST_MODE_MASK: u32 = 0x4; // [2]
-pub const MSI_ADDR_RH_MASK: u32 = 0x8; // [3]
-pub const MSI_ADDR_RSVD_2_MASK: u32 = 0xff0; // [11:4]
-pub const MSI_ADDR_DEST_FIELD_MASK: u32 = 0xff000; // [19:12]
-pub const MSI_ADDR_ADDR_BASE_MASK: u32 = 0xfff00000; // [31:20]
+pub const MSI_ADDR_BASE: u32 = 0xfee;
+pub const MSI_ADDR_DESTMODE_PHYS: u32 = 0x0;
 
 const MSIX_CAP_PBA: u8 = 0x08;
 
@@ -42,7 +38,120 @@ const MSIX_CAP_PBA: u8 = 0x08;
 //     pub msg_data: u32,
 //     pub masked: bool,
 // }
-#[derive(Copy, Clone, Default)]
+
+#[repr(C)]
+pub struct MsiAddrReg {
+    full: u64,
+}
+
+impl From<u64> for MsiAddrReg {
+    fn from(item: u64) -> Self {
+        MsiAddrReg { full: item }
+    }
+}
+
+impl From<MsiAddrReg> for u64 {
+    fn from(item: MsiAddrReg) -> Self {
+        item.full
+    }
+}
+
+impl MsiAddrReg {
+    /// rsvd_1: 0:1
+    pub fn rsvd_1(&self) -> u32 {
+        self.full.get_bits(0..2) as u32
+    }
+    /// dest_mode: 2
+    pub fn dest_mode(&self) -> u32 {
+        self.full.get_bits(2..3) as u32
+    }
+    /// rh: 3
+    pub fn rh(&self) -> u32 {
+        self.full.get_bits(3..4) as u32
+    }
+    /// rsvd_2: 4:11
+    pub fn rsvd_2(&self) -> u32 {
+        self.full.get_bits(4..12) as u32
+    }
+    /// dest_field: 12:19
+    pub fn dest_field(&self) -> u32 {
+        self.full.get_bits(12..20) as u32
+    }
+    /// addr_base: 20:31
+    pub fn addr_base(&self) -> u32 {
+        self.full.get_bits(20..32) as u32
+    }
+    /// hi_32: 32:63
+    pub fn hi_32(&self) -> u32 {
+        self.full.get_bits(32..64) as u32
+    }
+    /// intr_index_high: 2
+    pub fn intr_index_high(&self) -> u32 {
+        self.full.get_bits(2..3) as u32
+    }
+    /// shv: 3
+    pub fn shv(&self) -> u32 {
+        self.full.get_bits(3..4) as u32
+    }
+    /// intr_format: 4
+    pub fn intr_format(&self) -> u32 {
+        self.full.get_bits(4..5) as u32
+    }
+    /// intr_index_low: 5:19
+    pub fn intr_index_low(&self) -> u32 {
+        self.full.get_bits(5..20) as u32
+    }
+    /// constant: 20:31
+    pub fn constant(&self) -> u32 {
+        self.full.get_bits(20..32) as u32
+    }
+}
+
+#[repr(C)]
+pub struct MsiDataReg {
+    full: u32,
+}
+
+impl From<u32> for MsiDataReg {
+    fn from(item: u32) -> Self {
+        MsiDataReg { full: item }
+    }
+}
+
+impl From<MsiDataReg> for u32 {
+    fn from(item: MsiDataReg) -> Self {
+        item.full
+    }
+}
+
+impl MsiDataReg {
+    /// vector: 0:7
+    pub fn vector(&self) -> u8 {
+        self.full.get_bits(0..8) as u8
+    }
+    /// delivery_mode: 8:10
+    pub fn delivery_mode(&self) -> u8 {
+        self.full.get_bits(8..11) as u8
+    }
+    /// rsvd_1: 11:14
+    pub fn rsvd_1(&self) -> u8 {
+        self.full.get_bits(11..14) as u8
+    }
+    /// level: 14
+    pub fn level(&self) -> bool {
+        self.full.get_bit(14)
+    }
+    /// trigger_mode: 15
+    pub fn trigger_mode(&self) -> bool {
+        self.full.get_bit(15)
+    }
+    /// rsvd_2: 16:31
+    pub fn rsvd_2(&self) -> u16 {
+        self.full.get_bits(16..32) as u16
+    }
+}
+
+#[derive(Copy, Clone, Default, Debug)]
 pub struct MsiVector {
     pub msi_addr: u64,
     // [0:31]: data, [32:63]: vector control
@@ -400,49 +509,3 @@ pub fn init_msix(
 
     Ok(())
 }
-
-// /**
-//  *@pre Pointer vm shall point to Service VM
-//  */
-// static void inject_msi_for_lapic_pt(struct acrn_vm *vm, uint64_t addr, uint64_t data)
-// {
-// 	union apic_icr icr;
-// 	struct acrn_vcpu *vcpu;
-// 	union msi_addr_reg vmsi_addr;
-// 	union msi_data_reg vmsi_data;
-// 	uint64_t vdmask = 0UL;
-// 	uint32_t vdest, dest = 0U;
-// 	uint16_t vcpu_id;
-// 	bool phys;
-
-// 	vmsi_addr.full = addr;
-// 	vmsi_data.full = (uint32_t)data;
-
-// 	if (vmsi_addr.bits.addr_base == MSI_ADDR_BASE) {
-// 		vdest = vmsi_addr.bits.dest_field;
-// 		phys = (vmsi_addr.bits.dest_mode == MSI_ADDR_DESTMODE_PHYS);
-// 		/*
-// 		 * calculate all reachable destination vcpu.
-// 		 * the delivery mode of vmsi will be forwarded to ICR delievry field
-// 		 * and handled by hardware.
-// 		 */
-// 		vdmask = vlapic_calc_dest_noshort(vm, false, vdest, phys, false);
-
-// 		vcpu_id = ffs64(vdmask);
-// 		while (vcpu_id != INVALID_BIT_INDEX) {
-// 			bitmap_clear_nolock(vcpu_id, &vdmask);
-// 			vcpu = vcpu_from_vid(vm, vcpu_id);
-// 			dest |= per_cpu(lapic_ldr, pcpuid_from_vcpu(vcpu));
-// 			vcpu_id = ffs64(vdmask);
-// 		}
-
-// 		icr.value = 0UL;
-// 		icr.bits.dest_field = dest;
-// 		icr.bits.vector = vmsi_data.bits.vector;
-// 		icr.bits.delivery_mode = vmsi_data.bits.delivery_mode;
-// 		icr.bits.destination_mode = MSI_ADDR_DESTMODE_LOGICAL;
-
-// 		msr_write(MSR_IA32_EXT_APIC_ICR, icr.value);
-// 		dev_dbg(DBG_LEVEL_LAPICPT, "%s: icr.value 0x%016lx", __func__, icr.value);
-// 	}
-// }

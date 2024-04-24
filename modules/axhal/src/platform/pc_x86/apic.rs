@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 
+use bit_field::BitField;
 use lazy_init::LazyInit;
 use memory_addr::PhysAddr;
 use spinlock::SpinNoIrq;
@@ -26,6 +27,101 @@ const IO_APIC_BASE: PhysAddr = PhysAddr::from(0xFEC0_0000);
 static mut LOCAL_APIC: Option<LocalApic> = None;
 static mut IS_X2APIC: bool = false;
 static IO_APIC: LazyInit<SpinNoIrq<IoApic>> = LazyInit::new();
+
+#[repr(C)]
+pub struct ApicIcr {
+    full: u64,
+}
+
+impl From<u64> for ApicIcr {
+    fn from(item: u64) -> Self {
+        ApicIcr { full: item }
+    }
+}
+
+impl From<ApicIcr> for u64 {
+    fn from(item: ApicIcr) -> Self {
+        item.full
+    }
+}
+
+impl ApicIcr {
+    pub fn new(value: u64) -> Self {
+        ApicIcr { full: value }
+    }
+    /// Get u64 value of icr
+    pub fn value(&self) -> u64 {
+        self.full
+    }
+    /// Get icr vector 0..7
+    pub fn vector(&self) -> u8 {
+        self.full.get_bits(0..8) as u8
+    }
+    /// Set icr vector 0..7
+    pub fn set_vector(&mut self, value: u8) {
+        self.full.set_bits(0..8, value as u64);
+    }
+    /// Get icr delivery mode 8..10
+    pub fn delivery_mode(&self) -> u8 {
+        self.full.get_bits(8..11) as u8
+    }
+    /// Set icr delivery mode 8..10
+    pub fn set_delivery_mode(&mut self, value: u8) {
+        self.full.set_bits(8..11, value as u64);
+    }
+    /// Get icr destination mode 11
+    pub fn destination_mode(&self) -> bool {
+        self.full.get_bit(11)
+    }
+    /// Set icr destination mode 11
+    pub fn set_destination_mode(&mut self, value: bool) {
+        self.full.set_bit(11, value);
+    }
+    /// Get icr reserved 12..13
+    pub fn rsvd_1(&self) -> u8 {
+        self.full.get_bits(12..14) as u8
+    }
+    /// Get icr level 14
+    pub fn level(&self) -> bool {
+        self.full.get_bit(14)
+    }
+    /// Set icr level 14
+    pub fn set_level(&mut self, value: bool) {
+        self.full.set_bit(14, value);
+    }
+    /// Get icr trigger mode 15
+    pub fn trigger_mode(&self) -> bool {
+        self.full.get_bit(15)
+    }
+    /// Set icr trigger mode 15
+    pub fn set_trigger_mode(&mut self, value: bool) {
+        self.full.set_bit(15, value);
+    }
+    /// Get icr rsvd 16..17
+    pub fn rsvd_2(&self) -> u8 {
+        self.full.get_bits(16..18) as u8
+    }
+    /// Get icr shorthand 18..19
+    pub fn shorthand(&self) -> u8 {
+        self.full.get_bits(18..20) as u8
+    }
+    /// Set icr shorthand 18..19
+    pub fn set_shorthand(&mut self, value: u8) {
+        self.full.set_bits(18..20, value as u64);
+    }
+    /// Get icr reserved 20..31
+    pub fn rsvd_3(&self) -> u16 {
+        self.full.get_bits(20..32) as u16
+    }
+    /// Get icr dest field 32..63
+    pub fn dest_field(&self) -> u32 {
+        self.full.get_bits(32..64) as u32
+    }
+    /// Set icr dest field 32..63
+    pub fn set_dest_field(&mut self, value: u32) {
+        self.full.set_bits(32..64, value as u64);
+    }
+}
 
 /// Enables or disables the given IRQ.
 #[cfg(feature = "irq")]
