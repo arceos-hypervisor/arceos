@@ -1,93 +1,92 @@
 # ArceOS-Hypervisor
 
-This document contains some useful commands for running the ArceOS hypervisor as well as boot guest VM.
+This document aims to provide some useful commands for running ArceOS hypervisor as well as guest VM booting.
 
-To boot ArceOS hypervisor from Linux, it relies on our modified jailhouse kernel module driver. 
+To boot ArceOS hypervisor from Linux, our modified jailhouse kernel module driver is necessary. 
 
-When using the following script, make sure that the [jailhouse-arceos](https://github.com/arceos-hypervisor/jailhouse-arceos) repository is located at the same level as this arceos repository.
+When the following scripts being executed, the repo [jailhouse-arceos](https://github.com/arceos-hypervisor/jailhouse-arceos) is expected to be in the same folder as Arceos repository.
 
-Otherwise, you may need to find a way to copy the jailhouse-arceos folder into the Linux filesystem using your own method.
+Otherwise, you will need to manually copy the folder `jailhouse-arceos` into guest Linux filesystem.
 
 ## Setup environment 
 
-Boot Linux upon QEMU.
+Boot Linux by QEMU. Scripts in `scripts/host` help to setup the guest Linux rootfs.
 
-There are some scripts in `scripts/host` which may help you to setup a Linux rootfs.
-
-Firstly, prepare a Linux environment through [cloud-init](https://cloud-init.io/) and boot it upon QEMU.
+First, download a Linux image from [cloud-init](https://cloud-init.io/) and boot it by QEMU:
 
 ```bash
-# Enter scripts/host directory. 
+# in scripts/host
 cd scripts/host
 make image
 ```
-You only need to run upon commands once for downloading and configuration.
 
-Execute this command only for subsequent runs.
+The above command should be executed **exactly once**. And after setup, the following should be used instead:
+
 ```bash
-# Execute in the scripts/host directory. 
+# in scripts/host
 make qemu
 ```
 
-Note that when starting QEMU, you need to **open another terminal and use telnet to connect to the corresponding port**. The QEMU we use provides two serial ports for the upper-level virtual machine: COM0 at 0x3f8 and COM1 at 0x2f8. COM0 is connected to mon:std, while COM1 is bound to the lo loopback interface, here TCP port 4321.
+Note that after QEMU being started, **another terminal could be used to connect to it through telnet**. Two serial ports are provided for upper-level virtual machine: COM0 at 0x3f8 and COM1 at 0x2f8.
+
+* COM0 connected to mon:std,
+* COM1 bound to loopback interface, with TCP port `4321`.
 
 ```bash
 telnet localhost 4321
 ```
 
-See this [script](scripts/host/Makefile) for details.
+See [script](scripts/host/Makefile) for details.
 
-## Compile ArceOS-HV
+## Build ArceOS-HV
 
-Then, compile the ArceOS-HV itself in its root directory.
+Build ArceOS-HV in its root directory, by either command:
 
 ```bash
 make A=apps/hv HV=y TYPE1_5=y ARCH=x86_64 STRUCT=Hypervisor GUEST=nimbos LOG=debug SMP=2 build
-# You can also use this command which will copy the binary image file into Linux rootfs automatically.
+# The following command copies the binary image file into Linux rootfs automatically.
 make A=apps/hv HV=y TYPE1_5=y ARCH=x86_64 STRUCT=Hypervisor GUEST=nimbos LOG=debug SMP=2 scp_linux
 ```
 
 ## Copy scripts and image files
 
-The files inside the `scripts/guest` need to be copied to the Linux rootfs.
-
-We have prepared ready-to-use copy scripts in `scripts/host`. 
+Files inside the `scripts/guest` are meant to be copied to Linux rootfs. Fortunately, scripts are prepared to do so:
 
 ```bash
-# Execute in the scripts/host directory. 
+# in scripts/host
 ./scp.sh
 ```
-For specific information, please refer to `scripts/host/Makefile`.
 
-## Setup environment inside Linux rootfs.
+It works by invoking `make`s for three different targets. Refer to `scripts/host/Makefile` for specifics.
 
-**The remaining steps need to be performed within the Linux environment that we just booted.**
+## Setup environment inside Linux rootfs
 
-You can log in to the Linux CLI using the SSH script prepared in `scripts/host`, this way, you can access the Linux environment using the SSH port instead of the QEMU serial port (COM1, bind to local loopback interface as we mensioned before).
+**The remaining steps need to be performed within the Linux environment that has just booted.**
 
-* On host
+You can login by SSH to the guest Linux with prepared scripts, and in this way, QEMU serial ports are no longer needed:
+
+* From Host:
 
 ```bash
-# Execute in the scripts/host directory. 
+# in scripts/host. 
 make ssh
 ```
 
-* Inside Linux guest
+* From Guest:
 
 ```bash
-# Execute in guest /home/ubuntu directory.
+# in guest /home/ubuntu
 ./setup.sh
 ```
 
-After this step, the console of the host Linux is modified to ttyS1, which corresponds to COM1 at 0x2f8.
+Guest will reboot, and after which, console of host Linux is changed to ttyS1, corresponding to COM1 at 0x2f8.
 
 ## Boot arceos-hypervisor
 
-Before starting arceos-hypervisor, pay attention to the `gen-config.sh` file in the [jailhouse-arceos](https://github.com/arceos-hypervisor/jailhouse-arceos) folder. 
+Before proceeding, take some time looking on the file `gen-config.sh` from [jailhouse-arceos](https://github.com/arceos-hypervisor/jailhouse-arceos) folder.
 
-Here, you need to set the reserved memory space size for arceos-hypervisor based on the hardware memory information.
+Reserved memory space size is set in this file for arceos-hypervisor, with default set to 4G:
 
-Current script defaults to reserving 4GB of memory for arceos-hypervisor, just like this:
 ```bash
 # Line 2
 sudo python3 ./tools/jailhouse-config-create --mem-hv 4G ./configs/x86/qemu-arceos.c
@@ -95,33 +94,30 @@ sudo python3 ./tools/jailhouse-config-create --mem-hv 4G ./configs/x86/qemu-arce
 # Line 13
 cmdline='memmap=0x100000000\\\\\\$0x100000000 console=ttyS1'
 ```
-**If your hardware doesn't have that much memory, remember to reduce this memory size!!!**.
+**Reduce the reserved memory in case your hardware doesn't support that much.**
 
-The size of the reserved memory space needs to be larger than the physical memory size specified in the arceos [configuration file](modules/axconfig/src/platform/pc-x86-hv-type15.toml).
+Also note that reserved memory must be larger than physical memory size configured in [configuration file](modules/axconfig/src/platform/pc-x86-hv-type15.toml).
 
-
-We have prepared a script to boot the arceos-hypervisor. Run this command in user space on the host Linux.
+To boot arceos-hypervisor:
 
 ```bash
-# Execute in guest /home/ubuntu directory.
+# guest /home/ubuntu
 ./enable-arceos-hv.sh
 ```
 
-You can see that arceos-hypervisor is booted and initialized, and then it returns to the Linux environment. 
+arceos-hypervisor will be booted and initialized, and return to linux. Upon this, the original guest Linux has downgraded to a guest VM running on the arceos-hypervisor.
 
-At this point, Linux has been downgraded to a guest VM running on the arceos-hypervisor.
-
-Then you can start another guest VM through jailhouse cmd tool.
+It's also possible to start another guest through jailhouse cmd tool, like this:
 
 ```bash
-# Execute in guest /home/ubuntu directory.
+# in guest /home/ubuntu, just for example, not meant to executed
 sudo ${PATH_TO_JAILHOUSE_TOOL} axvm create CPU_MASK VM_TYPE BIOS_IMG KERNEL_IMG RAMDISK_IMG
 ```
 
-There is also some scripts for it.
+Some scripts are ready for it:
 
 ```bash
-# Execute in guest /home/ubuntu directory.
+# in guest /home/ubuntu
 ./boot_nimbios.sh
 ./boot_linux.sh
 ```
