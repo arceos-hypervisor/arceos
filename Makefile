@@ -96,7 +96,8 @@ endif
 
 ifeq ($(ARCH), x86_64)
   # Don't enable kvm for WSL/WSL2.
-  ACCEL ?= $(if $(findstring -microsoft, $(shell uname -r | tr '[:upper:]' '[:lower:]')),n,y)
+  # It seems to work fine on 5.15.146.1-microsoft-standard-WSL2
+  # ACCEL ?= $(if $(findstring -microsoft, $(shell uname -r | tr '[:upper:]' '[:lower:]')),n,y)
   PLATFORM_NAME ?= x86_64-qemu-q35
 else ifeq ($(ARCH), riscv64)
   ACCEL ?= n
