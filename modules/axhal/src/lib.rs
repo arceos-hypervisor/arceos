@@ -61,6 +61,16 @@ pub mod paging;
 pub mod console {
     pub use super::platform::console::*;
 
+    /// Writes a byte to the console.
+    pub fn console_putchar(c: u8) {
+        putchar(c)
+    }
+
+    /// Reads a byte from the console, or returns [`None`] if no input is available.
+    pub fn console_getchar() -> Option<u8> {
+        getchar()
+    }
+
     /// Write a slice of bytes to the console.
     pub fn write_bytes(bytes: &[u8]) {
         for c in bytes {
