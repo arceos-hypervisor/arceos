@@ -29,7 +29,7 @@ entry32:
 
     mov     esp, 0x7000         # temporary stack
     mov     ecx, 0x200000       # kernel entry
-    mov     eax, 0x1BADB002     # multiboot magic
+    mov     eax, 0x2BADB002     # multiboot magic
     mov     ebx, 0              # multiboot information (unsupported)
     jmp     ecx
 

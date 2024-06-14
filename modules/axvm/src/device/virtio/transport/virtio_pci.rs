@@ -34,7 +34,7 @@ use pci::config::{
 use pci::offset_of;
 use pci::util::{
     byte_code::ByteCode,
-    num_ops::{ranges_overlap, read_data_u32, write_data_u32},
+    num_ops::{ranges_overlap, read_data_u32, write_data_u32, write_data_u64},
 };
 use pci::{
     config::{PciConfig, PCI_CAP_ID_VNDR, PCI_CAP_VNDR_AND_NEXT_SIZE},
@@ -644,6 +644,7 @@ impl<B: BarAllocTrait + 'static> VirtioPciDevice<B> {
             match offset as u32 {
                 // read pci common cfg
                 VIRTIO_PCI_CAP_COMMON_OFFSET..VIRTIO_PCI_CAP_ISR_OFFSET => {
+                    debug!("read pci common cfg, offset is {}", offset);
                     let common_offset = offset - VIRTIO_PCI_CAP_COMMON_OFFSET as u64;
                     let value = match cloned_virtio_pci.lock().read_common_config(common_offset) {
                         Ok(v) => v,
@@ -656,10 +657,11 @@ impl<B: BarAllocTrait + 'static> VirtioPciDevice<B> {
                         }
                     };
 
-                    write_data_u32(&mut data[..], value);
+                    write_data_u64(&mut data[..], value);
                 }
                 // read pci isr cfg
                 VIRTIO_PCI_CAP_ISR_OFFSET..VIRTIO_PCI_CAP_DEVICE_OFFSET => {
+                    debug!("read pci isr cfg, offset is {}", offset);
                     let cloned_virtio_dev = cloned_virtio_pci.lock().device.clone();
                     if let Some(val) = data.get_mut(0) {
                         let device_lock = cloned_virtio_dev.lock();
@@ -671,6 +673,7 @@ impl<B: BarAllocTrait + 'static> VirtioPciDevice<B> {
                 }
                 // read pci device cfg
                 VIRTIO_PCI_CAP_DEVICE_OFFSET..VIRTIO_PCI_CAP_NOTIFY_OFFSET => {
+                    debug!("read pci device cfg, offset is {}", offset);
                     let cloned_virtio_dev = cloned_virtio_pci.lock().device.clone();
                     let device_offset = offset - VIRTIO_PCI_CAP_DEVICE_OFFSET as u64;
                     if let Err(e) = cloned_virtio_dev
@@ -683,6 +686,7 @@ impl<B: BarAllocTrait + 'static> VirtioPciDevice<B> {
                 }
                 // read pci notify cfg
                 VIRTIO_PCI_CAP_NOTIFY_OFFSET..VIRTIO_PCI_CAP_NOTIFY_END => {
+                    debug!("read pci notify cfg, offset is {}", offset);
                     // todo: need to notify hv to get the virtio request
                 }
                 _ => {
@@ -697,6 +701,10 @@ impl<B: BarAllocTrait + 'static> VirtioPciDevice<B> {
             match offset as u32 {
                 // write pci common cfg
                 VIRTIO_PCI_CAP_COMMON_OFFSET..VIRTIO_PCI_CAP_ISR_OFFSET => {
+                    debug!(
+                        "write pci common cfg, write data:{:?} offset is {}",
+                        data, offset
+                    );
                     let common_offset = offset - VIRTIO_PCI_CAP_COMMON_OFFSET as u64;
                     let mut value = 0;
                     if !read_data_u32(data, &mut value) {
@@ -715,9 +723,18 @@ impl<B: BarAllocTrait + 'static> VirtioPciDevice<B> {
                     }
                 }
                 // write pci isr cfg
-                VIRTIO_PCI_CAP_ISR_OFFSET..VIRTIO_PCI_CAP_DEVICE_OFFSET => {}
+                VIRTIO_PCI_CAP_ISR_OFFSET..VIRTIO_PCI_CAP_DEVICE_OFFSET => {
+                    debug!(
+                        "write pci isr cfg, write data:{:?} offset is {}",
+                        data, offset
+                    );
+                }
                 // write pci device cfg
                 VIRTIO_PCI_CAP_DEVICE_OFFSET..VIRTIO_PCI_CAP_NOTIFY_OFFSET => {
+                    debug!(
+                        "write pci device cfg, write data:{:?} offset is {}",
+                        data, offset
+                    );
                     let cloned_virtio_dev = cloned_virtio_pci.lock().device.clone();
                     let device_offset = offset - VIRTIO_PCI_CAP_DEVICE_OFFSET as u64;
                     if let Err(e) = cloned_virtio_dev
@@ -730,6 +747,10 @@ impl<B: BarAllocTrait + 'static> VirtioPciDevice<B> {
                 }
                 // write pci notify cfg
                 VIRTIO_PCI_CAP_NOTIFY_OFFSET..VIRTIO_PCI_CAP_NOTIFY_END => {
+                    debug!(
+                        "write pci notify cfg, write data:{:?} offset is {}",
+                        data, offset
+                    );
                     // todo: need to notify hv to get the virtio request
                 }
                 _ => {

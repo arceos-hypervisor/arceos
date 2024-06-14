@@ -328,7 +328,48 @@ pub fn write_data_u32(data: &mut [u8], value: u32) -> bool {
         }
         _ => {
             error!(
-                "Invalid data length: value {}, data len {}",
+                "[write_data_u32] Invalid data length: value {}, data len {}",
+                value,
+                data.len()
+            );
+            return false;
+        }
+    };
+    true
+}
+
+///  Write the given u32 to an array, returns the bool.
+///
+/// # Arguments
+///
+/// * `data` - The array of u8.
+/// * `value` - The u32 value
+///
+/// # Examples
+///
+/// ```rust
+/// extern crate util;
+/// use util::num_ops::write_data_u32;
+///
+/// let mut data: [u8; 8] = [0; 8];
+/// let ret = write_data_u64(&mut data, 0x1234567812345678);
+/// assert!(ret && data[0] == 0x78 && data[1] == 0x56 && data[2] == 0x34 && data[3] == 0x12 && data[4] == 0x78 && data[5] == 0x56 && data[6] == 0x34 && data[7] == 0x12);
+/// ```
+pub fn write_data_u64(data: &mut [u8], value: u32) -> bool {
+    match data.len() {
+        1 => data[0] = value as u8,
+        2 => {
+            LittleEndian::write_u16(data, value as u16);
+        }
+        4 => {
+            LittleEndian::write_u32(data, value);
+        }
+        8 => {
+            LittleEndian::write_u64(data, value as u64);
+        }
+        _ => {
+            error!(
+                "[write_data_u32] Invalid data length: value {}, data len {}",
                 value,
                 data.len()
             );
@@ -361,7 +402,10 @@ pub fn read_data_u32(data: &[u8], value: &mut u32) -> bool {
         2 => LittleEndian::read_u16(data) as u32,
         4 => LittleEndian::read_u32(data),
         _ => {
-            error!("Invalid data length: data len {}", data.len());
+            error!(
+                "[read_data_u32] Invalid data length: data len {}",
+                data.len()
+            );
             return false;
         }
     };
@@ -390,7 +434,10 @@ pub fn read_data_u16(data: &[u8], value: &mut u16) -> bool {
         1 => data[0] as u16,
         2 => LittleEndian::read_u16(data),
         _ => {
-            error!("Invalid data length: data len {}", data.len());
+            error!(
+                "[read_data_u32] Invalid data length: data len {}",
+                data.len()
+            );
             return false;
         }
     };

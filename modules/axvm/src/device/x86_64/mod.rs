@@ -26,10 +26,62 @@ use iced_x86::{Code, Instruction, OpKind, Register};
 use page_table_entry::MappingFlags;
 use pci::{AsAny, BarAllocTrait, PciDevOps, PciHost};
 use spin::Mutex;
+use x86_64::registers::rflags::RFlags;
 
 const VM_EXIT_INSTR_LEN_RDMSR: u8 = 2;
 const VM_EXIT_INSTR_LEN_WRMSR: u8 = 2;
 const VM_EXIT_INSTR_LEN_VMCALL: u8 = 3;
+
+macro_rules! build_getcc {
+    ($name:ident, $type:ty) => {
+        fn $name(mut x: $type, y: $type) -> u64 {
+            let result: u64;
+            unsafe {
+                core::arch::asm!("
+                    sub {1}, {2}
+                    pushfq
+                    pop {0}",
+                    out(reg) result,
+                    inout(reg) x,
+                    in(reg) y,
+                    options(nostack)
+                );
+            }
+            result
+        }
+    };
+}
+
+// build_getcc!(getcc8, u8);
+build_getcc!(getcc16, u16);
+build_getcc!(getcc32, u32);
+build_getcc!(getcc64, u64);
+
+// reg cannot use u8
+fn getcc8(mut x: u8, y: u8) -> u64 {
+    let result: u64;
+    unsafe {
+        core::arch::asm!("
+            sub {1}, {2}
+            pushfq
+            pop {0}",
+            out(reg) result,
+            inout(reg_byte) x,
+            in(reg_byte) y,
+            options(nostack)
+        );
+    }
+    result
+}
+
+fn getcc(access_size: u8, x: u64, y: u64) -> u64 {
+    match access_size {
+        1 => getcc8(x as u8, y as u8),
+        2 => getcc16(x as u16, y as u16),
+        4 => getcc32(x as u32, y as u32),
+        _ => getcc64(x, y),
+    }
+}
 
 pub struct DeviceList<H: HyperCraftHal, B: BarAllocTrait> {
     port_io_devices: Vec<Arc<Mutex<dyn PioOps>>>,
@@ -57,10 +109,10 @@ impl<H: HyperCraftHal, B: BarAllocTrait + 'static> DeviceList<H, B> {
     fn init_pci_host(&mut self) {
         if let Some(vm_id) = self.vm_id {
             let pci_host = PciHost::new(Some(Arc::new(super::virtio::VirtioMsiIrqManager {
-            vm_id: self.vm_id.expect("None vm for pci host"),
-        })));
-        self.pci_devices = Some(Arc::new(Mutex::new(pci_host)));
-        }else {
+                vm_id: self.vm_id.expect("None vm for pci host"),
+            })));
+            self.pci_devices = Some(Arc::new(Mutex::new(pci_host)));
+        } else {
             panic!("this is not vm devicelist. vm_id is None");
         }
     }
@@ -295,39 +347,124 @@ impl<H: HyperCraftHal, B: BarAllocTrait + 'static> DeviceList<H, B> {
                             _ => return Err(HyperError::InvalidParam),
                         };
                         debug!("[handle_mmio_instruction_to_device] write value:{:#x} to fault addr:{:#x} access_size:{:#x}", value, fault_addr, access_size);
-                        device.lock().write(fault_addr, access_size, value)?;
+                        let op_code = instr.op_code();
+                        match op_code.instruction_string().to_lowercase() {
+                            s if s.contains("mov") => {
+                                debug!("this is read mmio and instr: {}", s);
+                                device.lock().write(fault_addr, access_size, value)?;
+                            }
+                            _ => {
+                                error!("unrealized instruction:{:?}", op_code.instruction_string());
+                                return Err(HyperError::InstructionNotSupported);
+                            }
+                        };
                     } else {
                         let value = device.lock().read(fault_addr, access_size)?;
                         debug!("[handle_mmio_instruction_to_device] read from fault addr:{:#x} value:{:#x} access_size:{:#x}", fault_addr, value, access_size);
-                        if op_kind != OpKind::Register {
-                            return Err(HyperError::InvalidParam);
-                        }
-                        // not consider segment register
-                        let reg = match operand {
-                            _ if operand.contains("a") => &mut vcpu.regs_mut().rax,
-                            _ if operand.contains("b") => &mut vcpu.regs_mut().rbx,
-                            _ if operand.contains("c") => &mut vcpu.regs_mut().rcx,
-                            _ if operand.contains("d") => &mut vcpu.regs_mut().rdx,
-                            _ if operand.contains("si") => &mut vcpu.regs_mut().rsi,
-                            _ if operand.contains("di") => &mut vcpu.regs_mut().rdi,
-                            _ if operand.contains("bp") => &mut vcpu.regs_mut().rbp,
-                            _ if operand.contains("r8") => &mut vcpu.regs_mut().r8,
-                            _ if operand.contains("r9") => &mut vcpu.regs_mut().r9,
-                            _ if operand.contains("r10") => &mut vcpu.regs_mut().r10,
-                            _ if operand.contains("r11") => &mut vcpu.regs_mut().r11,
-                            _ if operand.contains("r12") => &mut vcpu.regs_mut().r12,
-                            _ if operand.contains("r13") => &mut vcpu.regs_mut().r13,
-                            _ if operand.contains("r14") => &mut vcpu.regs_mut().r14,
-                            _ if operand.contains("r15") => &mut vcpu.regs_mut().r15,
-                            _ => return Err(HyperError::InvalidParam),
+                        let (op_kind, op) = get_instr_data(instr.clone(), is_write)
+                            .expect("Failed to get instruction data");
+                        let op_code = instr.op_code();
+                        match op_code.instruction_string().to_lowercase() {
+                            s if s.contains("mov") => {
+                                debug!("this is read mmio and instr: {}", s);
+                                // mov instruction can only be used to write to register
+                                if op_kind != OpKind::Register {
+                                    debug!("opkind:{:?}", op_kind);
+                                    return Err(HyperError::InvalidParam);
+                                }
+                                // not consider segment register
+                                let reg = match operand {
+                                    _ if operand.contains("a") => &mut vcpu.regs_mut().rax,
+                                    _ if operand.contains("b") => &mut vcpu.regs_mut().rbx,
+                                    _ if operand.contains("c") => &mut vcpu.regs_mut().rcx,
+                                    _ if operand.contains("d") => &mut vcpu.regs_mut().rdx,
+                                    _ if operand.contains("si") => &mut vcpu.regs_mut().rsi,
+                                    _ if operand.contains("di") => &mut vcpu.regs_mut().rdi,
+                                    _ if operand.contains("bp") => &mut vcpu.regs_mut().rbp,
+                                    _ if operand.contains("r8") => &mut vcpu.regs_mut().r8,
+                                    _ if operand.contains("r9") => &mut vcpu.regs_mut().r9,
+                                    _ if operand.contains("r10") => &mut vcpu.regs_mut().r10,
+                                    _ if operand.contains("r11") => &mut vcpu.regs_mut().r11,
+                                    _ if operand.contains("r12") => &mut vcpu.regs_mut().r12,
+                                    _ if operand.contains("r13") => &mut vcpu.regs_mut().r13,
+                                    _ if operand.contains("r14") => &mut vcpu.regs_mut().r14,
+                                    _ if operand.contains("r15") => &mut vcpu.regs_mut().r15,
+                                    _ => return Err(HyperError::InvalidParam),
+                                };
+                                match access_size {
+                                    1 => *reg = (*reg & !0xff) | (value & 0xff) as u64,
+                                    2 => *reg = (*reg & !0xffff) | (value & 0xffff) as u64,
+                                    4 => {
+                                        *reg = (*reg & !0xffff_ffff) | (value & 0xffff_ffff) as u64
+                                    }
+                                    8 => *reg = value,
+                                    _ => unreachable!(),
+                                }
+                            }
+                            s if s.contains("test") => {
+                                debug!("this is read mmio and instr: {}", s);
+                                // test instruction use value from the other operand
+                                let value2 = match op_kind {
+                                    OpKind::Immediate8
+                                    | OpKind::Immediate16
+                                    | OpKind::Immediate32
+                                    | OpKind::Immediate64 => operand.parse::<u64>().unwrap(),
+                                    OpKind::Register => match operand {
+                                        _ if operand.contains("a") => vcpu.regs().rax,
+                                        _ if operand.contains("b") => vcpu.regs().rbx,
+                                        _ if operand.contains("c") => vcpu.regs().rcx,
+                                        _ if operand.contains("d") => vcpu.regs().rdx,
+                                        _ if operand.contains("si") => vcpu.regs().rsi,
+                                        _ if operand.contains("di") => vcpu.regs().rdi,
+                                        _ if operand.contains("bp") => vcpu.regs().rbp,
+                                        _ if operand.contains("r8") => vcpu.regs().r8,
+                                        _ if operand.contains("r9") => vcpu.regs().r9,
+                                        _ if operand.contains("r10") => vcpu.regs().r10,
+                                        _ if operand.contains("r11") => vcpu.regs().r11,
+                                        _ if operand.contains("r12") => vcpu.regs().r12,
+                                        _ if operand.contains("r13") => vcpu.regs().r13,
+                                        _ if operand.contains("r14") => vcpu.regs().r14,
+                                        _ if operand.contains("r15") => vcpu.regs().r15,
+                                        _ => return Err(HyperError::InvalidParam),
+                                    },
+                                    _ => return Err(HyperError::InvalidParam),
+                                };
+                                let result = match access_size {
+                                    1 => (value2 & value) & 0xff,
+                                    2 => (value2 & value) & 0xffff,
+                                    4 => (value2 & value) & 0xffff_ffff,
+                                    8 => value2 & value,
+                                    _ => unreachable!(),
+                                };
+                                /*
+                                 * OF and CF are cleared; the SF, ZF and PF flags are set
+                                 * according to the result; AF is undefined.
+                                 *
+                                 * The updated status flags are obtained by subtracting 0 from
+                                 * 'result'.
+                                 */
+                                let mut rflags = getcc(access_size, result, 0);
+                                debug!(
+                                    "value1:{:#x} value2:{:#x} rflags:{:#x}",
+                                    value, value2, rflags
+                                );
+                                // clear OF and CF
+                                rflags = rflags
+                                    & !(RFlags::OVERFLOW_FLAG.bits())
+                                    & !(RFlags::CARRY_FLAG.bits());
+                                // set mask for ZF, PF, SF, OF, CF
+                                let mask = RFlags::ZERO_FLAG.bits()
+                                    | RFlags::PARITY_FLAG.bits()
+                                    | RFlags::SIGN_FLAG.bits()
+                                    | RFlags::OVERFLOW_FLAG.bits()
+                                    | RFlags::CARRY_FLAG.bits();
+                                vcpu.set_guest_rflags(rflags as usize, mask as usize)?;
+                            }
+                            _ => {
+                                error!("unrealized instruction:{:?}", op_code.instruction_string());
+                                return Err(HyperError::InstructionNotSupported);
+                            }
                         };
-                        match access_size {
-                            1 => *reg = (*reg & !0xff) | (value & 0xff) as u64,
-                            2 => *reg = (*reg & !0xffff) | (value & 0xffff) as u64,
-                            4 => *reg = (*reg & !0xffff_ffff) | (value & 0xffff_ffff) as u64,
-                            8 => *reg = value,
-                            _ => unreachable!(),
-                        }
                     }
                 }
                 vcpu.advance_rip(exit_info.exit_instruction_length as _)?;
@@ -716,13 +853,13 @@ impl<H: HyperCraftHal, B: BarAllocTrait + 'static> PerVmDevices<H> for NimbosVmD
         // devices.add_pci_device(String::from("pcitest"), Arc::new(AtomicU16::new(0)), 0x18)?;
 
         // Create a virtio dummy device
-        // let virtio_device_dummy = DummyVirtioDevice::new(VIRTIO_TYPE_BLOCK, 1, 4);
-        // devices.add_virtio_pci_device(
-        //     String::from("virtio_blk_dummy"),
-        //     0x18,
-        //     Arc::new(Mutex::new(virtio_device_dummy)),
-        //     false,
-        // )?;
+        let virtio_device_dummy = DummyVirtioDevice::new(VIRTIO_TYPE_BLOCK, 1, 4);
+        devices.add_virtio_pci_device(
+            String::from("virtio_blk_dummy"),
+            0x18,
+            Arc::new(Mutex::new(virtio_device_dummy)),
+            false,
+        )?;
 
         Ok(Self {
             marker: PhantomData,
@@ -753,18 +890,50 @@ fn get_instr_data(
     instruction: Instruction,
     is_write: bool,
 ) -> HyperResult<(OpKind, Option<String>)> {
-    let op_code = instruction.op_code();
-    match op_code.instruction_string().to_lowercase() {
-        s if s.contains("mov") => {
-            debug!("this is instr: {}", s);
-            return get_mov_data(instruction, is_write);
+    // only support 2 operands instruction
+    let (kind, op_str) = match (instruction.op0_kind(), instruction.op1_kind()) {
+        (OpKind::Register, _) => {
+            let reg = instruction.op0_register();
+            (OpKind::Register, Some(format!("{:?}", reg).to_lowercase()))
         }
-        _ => {
-            error!("unrealized instruction:{:?}", op_code);
-            return Err(HyperError::InstructionNotSupported);
+        (_, OpKind::Register) => {
+            let reg = instruction.op1_register();
+            (OpKind::Register, Some(format!("{:?}", reg).to_lowercase()))
         }
+        (OpKind::Immediate8, _) | (_, OpKind::Immediate8) => (
+            OpKind::Immediate8,
+            Some(format!("{:?}", instruction.immediate64())),
+        ),
+        (OpKind::Immediate16, _) | (_, OpKind::Immediate16) => (
+            OpKind::Immediate16,
+            Some(format!("{:?}", instruction.immediate64())),
+        ),
+        (OpKind::Immediate32, _) | (_, OpKind::Immediate32) => (
+            OpKind::Immediate32,
+            Some(format!("{:?}", instruction.immediate64())),
+        ),
+        (OpKind::Immediate64, _) | (_, OpKind::Immediate64) => (
+            OpKind::Immediate64,
+            Some(format!("{:?}", instruction.immediate64())),
+        ),
+        _ => return Err(HyperError::OperandNotSupported),
     };
-    Err(HyperError::InstructionNotSupported)
+    Ok((kind, op_str))
+    // let op_code = instruction.op_code();
+    // match op_code.instruction_string().to_lowercase() {
+    //     s if s.contains("mov") => {
+    //         debug!("this is instr: {}", s);
+    //         return get_mov_data(instruction, is_write);
+    //     }
+    //     s if s.contains("test") => {
+    //         debug!("this is instr: {}", s);
+    //     }
+    //     _ => {
+    //         error!("unrealized instruction:{:?}", op_code.instruction_string());
+    //         return Err(HyperError::InstructionNotSupported);
+    //     }
+    // };
+    // Err(HyperError::InstructionNotSupported)
 }
 
 fn get_mov_data(instruction: Instruction, is_write: bool) -> HyperResult<(OpKind, Option<String>)> {
