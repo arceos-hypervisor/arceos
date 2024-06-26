@@ -421,11 +421,12 @@ impl MmioOps for Bar {
     }
 
     fn write(&mut self, addr: u64, access_size: u8, value: u64) -> hypercraft::HyperResult {
-        // debug!("this is mmio write addr:{:#x}", addr);
+        debug!("this is mmio write addr:{:#x} value:{:#x}", addr, value);
         if self.ops.is_some() {
             let offset = addr - self.address;
             let write_func = &*self.ops.as_ref().unwrap().write;
             let value_bytes = value.to_le_bytes();
+            // debug!("value_bytes: {:?}", value_bytes);
             let value_byte: &[u8] = match access_size {
                 1 => &value_bytes[0..1],
                 2 => &value_bytes[0..2],

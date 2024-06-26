@@ -350,7 +350,7 @@ impl<H: HyperCraftHal, B: BarAllocTrait + 'static> DeviceList<H, B> {
                         let op_code = instr.op_code();
                         match op_code.instruction_string().to_lowercase() {
                             s if s.contains("mov") => {
-                                debug!("this is read mmio and instr: {}", s);
+                                debug!("this is write mmio and instr: {}", s);
                                 device.lock().write(fault_addr, access_size, value)?;
                             }
                             _ => {
@@ -359,6 +359,7 @@ impl<H: HyperCraftHal, B: BarAllocTrait + 'static> DeviceList<H, B> {
                             }
                         };
                     } else {
+                        debug!("[handle_mmio_instruction_to_device] read begin");
                         let value = device.lock().read(fault_addr, access_size)?;
                         debug!("[handle_mmio_instruction_to_device] read from fault addr:{:#x} value:{:#x} access_size:{:#x}", fault_addr, value, access_size);
                         let (op_kind, op) = get_instr_data(instr.clone(), is_write)
@@ -468,6 +469,7 @@ impl<H: HyperCraftHal, B: BarAllocTrait + 'static> DeviceList<H, B> {
                     }
                 }
                 vcpu.advance_rip(exit_info.exit_instruction_length as _)?;
+                debug!("===============");
                 return Ok(());
             } else {
                 panic!(
@@ -487,10 +489,10 @@ impl<H: HyperCraftHal, B: BarAllocTrait + 'static> DeviceList<H, B> {
     ) -> Option<HyperResult> {
         match vcpu.nested_page_fault_info() {
             Ok(fault_info) => {
-                debug!(
-                    "VM exit: EPT violation @ {:#x}, fault_paddr={:#x}, access_flags=({:?}), vcpu: {:#x?}",
-                    exit_info.guest_rip, fault_info.fault_guest_paddr, fault_info.access_flags, vcpu
-                );
+                // debug!(
+                //     "VM exit: EPT violation @ {:#x}, fault_paddr={:#x}, access_flags=({:?}), vcpu: {:#x?}",
+                //     exit_info.guest_rip, fault_info.fault_guest_paddr, fault_info.access_flags, vcpu
+                // );
                 if let Some(dev) = self.find_memory_io_device(fault_info.fault_guest_paddr as u64) {
                     return Some(Self::handle_mmio_instruction_to_device(
                         vcpu, exit_info, dev, instr,

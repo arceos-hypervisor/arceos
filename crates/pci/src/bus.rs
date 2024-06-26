@@ -67,7 +67,7 @@ impl<B: BarAllocTrait> PciBus<B> {
     /// * `devfn` - Slot number << 8 | device number.
     pub fn get_device(&self, bus_num: u8, devfn: u8) -> Option<Arc<Mutex<dyn PciDevOps<B>>>> {
         if let Some(dev) = self.devices.get(&devfn) {
-            debug!("Find device {}:{}", bus_num, devfn);
+            // debug!("Find device {}:{}", bus_num, devfn);
             return Some((*dev).clone());
         }
         // debug!("Can't find device {}:{}", bus_num, devfn);

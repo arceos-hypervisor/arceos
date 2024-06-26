@@ -552,6 +552,7 @@ impl<B: BarAllocTrait + 'static> VirtioPciDevice<B> {
             COMMON_STATUS_REG => {
                 if value & CONFIG_STATUS_FEATURES_OK != 0 && value & CONFIG_STATUS_DRIVER_OK == 0 {
                     let features = (locked_device.driver_features(1) as u64) << 32;
+                    debug!("driver_features is {:#x}", features);
                     if !virtio_has_feature(features, VIRTIO_F_VERSION_1) {
                         error!(
                             "Device is modern only, but the driver not support VIRTIO_F_VERSION_1"
@@ -644,7 +645,7 @@ impl<B: BarAllocTrait + 'static> VirtioPciDevice<B> {
             match offset as u32 {
                 // read pci common cfg
                 VIRTIO_PCI_CAP_COMMON_OFFSET..VIRTIO_PCI_CAP_ISR_OFFSET => {
-                    debug!("read pci common cfg, offset is {}", offset);
+                    debug!("read pci common cfg, offset is {:#x}", offset);
                     let common_offset = offset - VIRTIO_PCI_CAP_COMMON_OFFSET as u64;
                     let value = match cloned_virtio_pci.lock().read_common_config(common_offset) {
                         Ok(v) => v,
@@ -702,7 +703,7 @@ impl<B: BarAllocTrait + 'static> VirtioPciDevice<B> {
                 // write pci common cfg
                 VIRTIO_PCI_CAP_COMMON_OFFSET..VIRTIO_PCI_CAP_ISR_OFFSET => {
                     debug!(
-                        "write pci common cfg, write data:{:?} offset is {}",
+                        "write pci common cfg, write data:{:?} offset is {:#x}",
                         data, offset
                     );
                     let common_offset = offset - VIRTIO_PCI_CAP_COMMON_OFFSET as u64;
@@ -725,14 +726,14 @@ impl<B: BarAllocTrait + 'static> VirtioPciDevice<B> {
                 // write pci isr cfg
                 VIRTIO_PCI_CAP_ISR_OFFSET..VIRTIO_PCI_CAP_DEVICE_OFFSET => {
                     debug!(
-                        "write pci isr cfg, write data:{:?} offset is {}",
+                        "write pci isr cfg, write data:{:?} offset is {:#x}",
                         data, offset
                     );
                 }
                 // write pci device cfg
                 VIRTIO_PCI_CAP_DEVICE_OFFSET..VIRTIO_PCI_CAP_NOTIFY_OFFSET => {
                     debug!(
-                        "write pci device cfg, write data:{:?} offset is {}",
+                        "write pci device cfg, write data:{:?} offset is {:#x}",
                         data, offset
                     );
                     let cloned_virtio_dev = cloned_virtio_pci.lock().device.clone();
@@ -748,13 +749,13 @@ impl<B: BarAllocTrait + 'static> VirtioPciDevice<B> {
                 // write pci notify cfg
                 VIRTIO_PCI_CAP_NOTIFY_OFFSET..VIRTIO_PCI_CAP_NOTIFY_END => {
                     debug!(
-                        "write pci notify cfg, write data:{:?} offset is {}",
+                        "write pci notify cfg, write data:{:?} offset is {:#x}",
                         data, offset
                     );
                     // todo: need to notify hv to get the virtio request
                 }
                 _ => {
-                    error!("Invalid offset for pci cfg cap, offset is {}", offset);
+                    error!("Invalid offset for pci cfg cap, offset is {:#x}", offset);
                     return Err(HyperError::InValidMmioRead);
                 }
             };
