@@ -52,6 +52,10 @@ ifeq ($(HV), y)
   ax_feat += hv
 endif
 
+ifeq ($(HV), y)
+  ax_feat += hv
+endif
+
 ifeq ($(shell test $(SMP) -gt 1; echo $$?),0)
   lib_feat += smp
 endif
