@@ -1,6 +1,13 @@
 mod context;
 pub(crate) mod trap;
 
+#[cfg(feature = "hv")]
+pub mod hv;
+#[cfg(feature = "hv")]
+pub use hv::register_exception_handler_aarch64;
+#[cfg(feature = "hv")]
+pub use hv::exception_utils;
+
 use core::arch::asm;
 
 use aarch64_cpu::registers::{DAIF, TPIDR_EL0, TTBR0_EL1, TTBR1_EL1, VBAR_EL1};

@@ -29,8 +29,9 @@ fn make_cfg_values(str_list: &[&str]) -> String {
 fn main() {
     let arch = std::env::var("CARGO_CFG_TARGET_ARCH").unwrap();
     let platform = axconfig::PLATFORM;
+    let is_hv = get_is_hv();
     if platform != "dummy" {
-        gen_linker_script(&arch, platform).unwrap();
+        gen_linker_script(&arch, platform, is_hv).unwrap();
     }
 
     println!("cargo:rustc-cfg=platform=\"{}\"", platform);
@@ -45,8 +46,11 @@ fn main() {
     );
 }
 
-fn gen_linker_script(arch: &str, platform: &str) -> Result<()> {
-    let fname = format!("linker_{}.lds", platform);
+fn gen_linker_script(arch: &str, platform: &str, is_hv: bool) -> Result<()> {
+    let mut fname = format!("linker_{}.lds", platform);
+    if is_hv {
+        fname = format!("linker_{}_hv.lds", platform);
+    }
     let output_arch = if arch == "x86_64" {
         "i386:x86-64"
     } else if arch.contains("riscv") {
@@ -68,4 +72,16 @@ fn gen_linker_script(arch: &str, platform: &str) -> Result<()> {
     let out_path = Path::new(&out_dir).join("../../..").join(fname);
     std::fs::write(out_path, ld_content)?;
     Ok(())
+}
+
+fn get_is_hv() -> bool {
+    let mut is_hv = false;
+    let hv_env = std::env::var("HV");
+    if hv_env.is_ok() {
+        let hv = hv_env.unwrap();
+        if hv == "y" {
+            is_hv = true;
+        }
+    }
+    is_hv
 }

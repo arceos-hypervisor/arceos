@@ -6,8 +6,13 @@ use memory_addr::PhysAddr;
 /// The maximum number of IRQs.
 pub const MAX_IRQ_COUNT: usize = 1024;
 
+#[cfg(not(feature = "hv"))]
 /// The timer IRQ number.
 pub const TIMER_IRQ_NUM: usize = translate_irq(14, InterruptType::PPI).unwrap();
+
+#[cfg(feature = "hv")]
+/// Non-secure EL2 Physical Timer irq number.
+pub const TIMER_IRQ_NUM: usize = translate_irq(10, InterruptType::PPI).unwrap();
 
 /// The UART IRQ number.
 pub const UART_IRQ_NUM: usize = translate_irq(axconfig::UART_IRQ, InterruptType::SPI).unwrap();

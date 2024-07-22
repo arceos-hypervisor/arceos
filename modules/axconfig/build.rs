@@ -20,7 +20,11 @@ fn resolve_config_path(platform: Option<&str>) -> Result<PathBuf> {
     let path = match platform {
         None | Some("") => "defconfig.toml".into(),
         Some(plat) if builtin_platforms.contains(&plat.to_string()) => {
-            config_dir.join(format!("{plat}.toml"))
+            if cfg!(feature = "hv" ) {
+                config_dir.join(format!("{plat}-hv.toml"))
+            }else {
+                config_dir.join(format!("{plat}.toml"))
+            }
         }
         Some(plat) => {
             let path = PathBuf::from(&plat);

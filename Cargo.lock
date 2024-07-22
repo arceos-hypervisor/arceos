@@ -289,6 +289,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "66ccd41dd4ef364e2385901a5c2a3adea974a41eccb2529c1f24e4c8bc93d834"
 dependencies = [
  "log",
+ "x86",
 ]
 
 [[package]]
@@ -375,6 +376,7 @@ dependencies = [
  "axlog",
  "bitflags 2.6.0",
  "cfg-if",
+ "cortex-a",
  "dw_apb_uart",
  "handler_table",
  "int_ratio",

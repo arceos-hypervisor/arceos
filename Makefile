@@ -58,6 +58,9 @@ VHOST ?= n
 IP ?= 10.0.2.15
 GW ?= 10.0.2.2
 
+# Hypervisor options
+HV ?= n
+
 # App type
 ifeq ($(wildcard $(APP)),)
   $(error Application path "$(APP)" is not valid)
@@ -152,6 +155,10 @@ APP_NAME := $(shell basename $(APP))
 LD_SCRIPT := $(TARGET_DIR)/$(TARGET)/$(MODE)/linker_$(PLATFORM_NAME).lds
 OUT_ELF := $(OUT_DIR)/$(APP_NAME)_$(PLATFORM_NAME).elf
 OUT_BIN := $(OUT_DIR)/$(APP_NAME)_$(PLATFORM_NAME).bin
+
+ifeq ($(HV), y)
+	LD_SCRIPT = $(CURDIR)/modules/axhal/linker_$(PLATFORM_NAME)_hv.lds
+endif
 
 all: build
 
