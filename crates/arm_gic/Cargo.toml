@@ -9,7 +9,5 @@ homepage = "https://github.com/arceos-org/arceos"
 repository = "https://github.com/arceos-org/arceos/tree/main/crates/arm_gic"
 documentation = "https://arceos-org.github.io/arceos/arm_gic/index.html"
 
-
-
 [dependencies]
 tock-registers = "0.8"
