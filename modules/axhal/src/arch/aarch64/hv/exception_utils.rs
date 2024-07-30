@@ -23,7 +23,9 @@ fn exception_far() -> usize {
 #[inline(always)]
 fn exception_hpfar() -> usize {
     let hpfar: u64;
-    unsafe{core::arch::asm!("mrs {}, HPFAR_EL2", out(reg) hpfar);}
+    unsafe {
+        core::arch::asm!("mrs {}, HPFAR_EL2", out(reg) hpfar);
+    }
     hpfar as usize
 }
 

@@ -27,7 +27,10 @@ static LOWER_AARCH64_HANDLERS: [AtomicUsize; MAX_EXCEPTION_COUNT] =
 const MAX_EXCEPTION_COUNT: usize = 64;
 
 #[allow(dead_code)]
-pub fn register_exception_handler_aarch64(exception_class: usize, handler: ExceptionHandler) -> bool {
+pub fn register_exception_handler_aarch64(
+    exception_class: usize,
+    handler: ExceptionHandler,
+) -> bool {
     if exception_class < MAX_EXCEPTION_COUNT {
         LOWER_AARCH64_HANDLERS[exception_class].store(handler as usize, Ordering::SeqCst);
         return true;
@@ -45,7 +48,7 @@ fn call_handler(exception_class: usize, tf: &mut TrapFrame) -> bool {
         } else {
             return false;
         }
-    }else {
+    } else {
         false
     }
 }

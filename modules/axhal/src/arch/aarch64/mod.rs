@@ -4,9 +4,9 @@ pub(crate) mod trap;
 #[cfg(feature = "hv")]
 pub mod hv;
 #[cfg(feature = "hv")]
-pub use hv::register_exception_handler_aarch64;
-#[cfg(feature = "hv")]
 pub use hv::exception_utils;
+#[cfg(feature = "hv")]
+pub use hv::register_exception_handler_aarch64;
 
 use core::arch::asm;
 
