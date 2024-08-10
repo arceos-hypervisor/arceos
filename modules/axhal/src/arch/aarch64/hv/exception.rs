@@ -1,21 +1,16 @@
-// Copyright (c) 2023 Beihang University, Huawei Technologies Co.,Ltd. All rights reserved.
-// Rust-Shyper is licensed under Mulan PSL v2.
-// You can use this software according to the terms and conditions of the Mulan PSL v2.
-// You may obtain a copy of Mulan PSL v2 at:
-//          http://license.coscl.org.cn/MulanPSL2
-// THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND,
-// EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT,
-// MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
-// See the Mulan PSL v2 for more details.
-
-use super::exception_utils::*;
 use core::arch::global_asm;
+use core::sync::atomic::{AtomicUsize, Ordering};
+
+use aarch64_cpu::registers::{ESR_EL2, FAR_EL2};
 use tock_registers::interfaces::*;
 
-global_asm!(include_str!("exception.S"));
+use memory_addr::VirtAddr;
+use page_table_entry::MappingFlags;
+
+use super::exception_utils::*;
 use crate::arch::TrapFrame;
 
-use core::sync::atomic::{AtomicUsize, Ordering};
+global_asm!(include_str!("exception.S"));
 
 type ExceptionHandler = fn(&mut TrapFrame);
 
@@ -73,9 +68,53 @@ enum TrapSource {
     LowerAArch32 = 3,
 }
 
+fn handle_data_abort(tf: &TrapFrame, iss: u64, is_guest: bool) {
+    let wnr = (iss & (1 << 6)) != 0; // WnR: Write not Read
+    let cm = (iss & (1 << 8)) != 0; // CM: Cache maintenance
+    let mut access_flags = if wnr & !cm {
+        MappingFlags::WRITE
+    } else {
+        MappingFlags::READ
+    };
+    if is_guest {
+        access_flags |= MappingFlags::USER;
+    }
+    let vaddr = VirtAddr::from(FAR_EL2.get() as usize);
+
+    // Only handle Translation fault and Permission fault
+    panic!(
+        "Unhandled {} Data Abort @ {:#x}, fault_vaddr={:#x}, ISS=0b{:08b} ({:?}):\n{:#x?}",
+        if is_guest { "EL1" } else { "EL2" },
+        tf.elr,
+        vaddr,
+        iss,
+        access_flags,
+        tf,
+    );
+}
+
 /// deal with invalid aarch64 synchronous exception
 #[no_mangle]
 fn invalid_exception_el2(tf: &mut TrapFrame, kind: TrapKind, source: TrapSource) {
+    let esr = ESR_EL2.extract();
+    let iss = esr.read(ESR_EL2::ISS);
+    let ec = esr.read(ESR_EL2::EC);
+
+    match esr.read_as_enum(ESR_EL2::EC) {
+        Some(ESR_EL2::EC::Value::DataAbortLowerEL) => handle_data_abort(tf, iss, true),
+        Some(ESR_EL2::EC::Value::DataAbortCurrentEL) => handle_data_abort(tf, iss, false),
+        _ => {
+            panic!(
+                "Unhandled synchronous exception @ {:#x}: ESR={:#x} (EC {:#08b}, ISS {:#x})",
+                tf.elr,
+                esr.get(),
+                esr.read(ESR_EL2::EC),
+                esr.read(ESR_EL2::ISS),
+            );
+        }
+    }
+    warn!("iss {:#x} ec {:#x}", iss, ec);
+
     panic!(
         "Invalid exception {:?} from {:?}:\n{:#x?}",
         kind, source, tf
