@@ -1116,8 +1116,9 @@ checksum = "57c0d7b74b563b49d38dae00a0c37d4d6de9b432382b2892f0574ddcae73fd0a"
 
 [[package]]
 name = "percpu"
-version = "0.1.3"
-source = "git+https://github.com/arceos-org/percpu.git?branch=arm-el2#586e27d9a7ee089afee4a1de925ff4ecf00ae80c"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bb9f741dad8f795c2161b4ecde6934b2ee661697ccb7f8ba3752392cd82e9cc9"
 dependencies = [
  "cfg-if",
  "kernel_guard",
@@ -1128,8 +1129,9 @@ dependencies = [
 
 [[package]]
 name = "percpu_macros"
-version = "0.1.3"
-source = "git+https://github.com/arceos-org/percpu.git?branch=arm-el2#586e27d9a7ee089afee4a1de925ff4ecf00ae80c"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ef783de4aeafcd0832cb685908773d2cf2b5875d262cfd2708b4bb29732a6d02"
 dependencies = [
  "proc-macro2",
  "quote",
