@@ -55,6 +55,12 @@ fn invalid_exception_el2(tf: &mut TrapFrame, kind: TrapKind, source: TrapSource)
     );
 }
 
+/// deal with current el irq exception (need to remove after implement interrupt virtualization)
+#[no_mangle]
+fn handle_irq_exception(_tf: &TrapFrame) {
+    handle_trap!(IRQ, 0);
+}
+
 // /// deal with lower aarch64 interruption exception
 // #[no_mangle]
 // fn current_spxel_irq(ctx: &mut TrapFrame) {

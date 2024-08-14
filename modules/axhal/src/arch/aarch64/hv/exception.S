@@ -59,12 +59,12 @@
     b       .Lexception_return_el2
 .endm
 
-.macro HANDLE_CURRENT_IRQ
+.macro HANDLE_IRQ
 .p2align 7
     SAVE_REGS_EL2
-    ldr     x9, =LOWER_AARCH64_IRQ_HANDLER
-    ldr     x8, [x9]
-    blr     x8
+    mov     x0, sp
+    bl      handle_irq_exception
+    b       .Lexception_return_el2
 .endm
 
 .macro HANDLE_LOWER_IRQ
@@ -96,7 +96,7 @@ exception_vector_base_el2:
 
     // current EL, with SP_ELx
     INVALID_EXCP_EL2 0 1
-    INVALID_EXCP_EL2 1 1
+    HANDLE_IRQ
     INVALID_EXCP_EL2 2 1
     INVALID_EXCP_EL2 3 1
 

@@ -1,4 +1,5 @@
 mod context;
+#[cfg(not(feature = "hv"))]
 pub(crate) mod trap;
 
 #[cfg(feature = "hv")]
