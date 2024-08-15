@@ -17,7 +17,7 @@ pub(super) const S_TIMER: usize = INTC_IRQ_BASE + 5;
 /// Supervisor external interrupt in `scause`
 pub(super) const S_EXT: usize = INTC_IRQ_BASE + 9;
 
-static TIMER_HANDLER: LazyInit<IrqHandler> = LazyInit::new();
+static mut TIMER_HANDLER: IrqHandler = || {};
 
 /// The maximum number of IRQs.
 pub const MAX_IRQ_COUNT: usize = 1024;
@@ -49,11 +49,11 @@ pub fn set_enable(scause: usize, _enabled: bool) {
 pub fn register_handler(scause: usize, handler: IrqHandler) -> bool {
     with_cause!(
         scause,
-        @TIMER => if !TIMER_HANDLER.is_inited() {
-            TIMER_HANDLER.init_once(handler);
+        @TIMER => {
+            unsafe{
+                TIMER_HANDLER = handler;
+            }
             true
-        } else {
-            false
         },
         @EXT => crate::irq::register_handler_common(scause & !INTC_IRQ_BASE, handler),
     )
@@ -69,7 +69,9 @@ pub fn dispatch_irq(scause: usize) {
         scause,
         @TIMER => {
             trace!("IRQ: timer");
-            TIMER_HANDLER();
+            unsafe {
+                TIMER_HANDLER();
+            }
         },
         @EXT => crate::irq::dispatch_irq_common(0), // TODO: get IRQ number from PLIC
     );
