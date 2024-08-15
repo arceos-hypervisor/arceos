@@ -78,8 +78,8 @@
 
 .section .text
 .p2align 11
-.global exception_vector_base_el2
-exception_vector_base_el2:
+.global exception_vector_base
+exception_vector_base:
     // current EL, with SP_EL0
     INVALID_EXCP_EL2 0 0
     INVALID_EXCP_EL2 1 0

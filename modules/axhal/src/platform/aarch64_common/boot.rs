@@ -180,11 +180,6 @@ unsafe extern "C" fn _start_secondary() -> ! {
 }
 
 #[cfg(feature = "hv")]
-extern "C" {
-    fn exception_vector_base_el2();
-}
-
-#[cfg(feature = "hv")]
 unsafe fn switch_to_el2() {
     SPSel.write(SPSel::SP::ELx);
     let current_el = CurrentEL.read(CurrentEL::EL);
@@ -294,10 +289,6 @@ unsafe extern "C" fn _start() -> ! {
         mov x0, #2
         bl  {cache_invalidate}
 
-        // setup vbar_el2 for hypervisor
-        ldr x8, ={exception_vector_base_el2}    
-        msr vbar_el2, x8
-
         mrs     x19, mpidr_el1
         and     x19, x19, #0xffffff     // get current CPU id
         mov     x20, x0                 // save DTB pointer
@@ -320,7 +311,6 @@ unsafe extern "C" fn _start() -> ! {
         blr     x8
         b      .",
         cache_invalidate = sym cache_invalidate,
-        exception_vector_base_el2 = sym exception_vector_base_el2,
         init_boot_page_table = sym init_boot_page_table,
         init_mmu_el2 = sym init_mmu_el2,
         switch_to_el2 = sym switch_to_el2,

@@ -10,7 +10,7 @@ pub use hv::{register_lower_aarch64_irq_handler, register_lower_aarch64_synchron
 use core::arch::asm;
 
 #[cfg(feature = "hv")]
-use aarch64_cpu::registers::TTBR0_EL2;
+use aarch64_cpu::registers::{TTBR0_EL2, VBAR_EL2};
 //Todo: remove this, when hv is enabled, `TTBR1_EL1` is not used.
 #[cfg_attr(feature = "hv", allow(unused_imports))]
 use aarch64_cpu::registers::{DAIF, TPIDR_EL0, TTBR0_EL1, TTBR1_EL1, VBAR_EL1};
@@ -144,8 +144,11 @@ pub fn flush_icache_all() {
 
 /// Sets the base address of the exception vector (writes `VBAR_EL1`).
 #[inline]
-pub fn set_exception_vector_base(vbar_el1: usize) {
-    VBAR_EL1.set(vbar_el1 as _);
+pub fn set_exception_vector_base(vbar: usize) {
+    #[cfg(not(feature = "hv"))]
+    VBAR_EL1.set(vbar as _);
+    #[cfg(feature = "hv")]
+    VBAR_EL2.set(vbar as _);
 }
 
 /// Flushes the data cache line (64 bytes) at the given virtual address
