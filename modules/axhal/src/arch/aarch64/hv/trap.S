@@ -102,7 +102,7 @@ exception_vector_base_el2:
 
     // lower EL, aarch64
     HANDLE_LOWER_SYNC
-    INVALID_EXCP_EL2 2 1
+    HANDLE_IRQ
     INVALID_EXCP_EL2 2 2
     INVALID_EXCP_EL2 3 2
 

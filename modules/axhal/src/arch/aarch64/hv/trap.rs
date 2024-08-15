@@ -1,10 +1,10 @@
 use core::arch::global_asm;
+use core::sync::atomic::{AtomicUsize, Ordering};
 use tock_registers::interfaces::*;
 
-global_asm!(include_str!("exception.S"));
 use crate::arch::TrapFrame;
 
-use core::sync::atomic::{AtomicUsize, Ordering};
+global_asm!(include_str!("trap.S"));
 
 type VmExitHandler = unsafe extern "C" fn();
 
@@ -25,6 +25,12 @@ pub unsafe fn register_lower_aarch64_synchronous_handler(handler: VmExitHandler)
 pub unsafe fn register_lower_aarch64_irq_handler(handler: VmExitHandler) {
     LOWER_AARCH64_IRQ_HANDLER = handler;
 }
+
+#[allow(dead_code)]
+fn get_lower_aarch64_irq_handler() -> VmExitHandler {
+    unsafe { LOWER_AARCH64_IRQ_HANDLER }
+}
+
 
 #[repr(u8)]
 #[derive(Debug)]
@@ -58,7 +64,10 @@ fn invalid_exception_el2(tf: &mut TrapFrame, kind: TrapKind, source: TrapSource)
 /// deal with current el irq exception (need to remove after implement interrupt virtualization)
 #[no_mangle]
 fn handle_irq_exception(_tf: &TrapFrame) {
-    handle_trap!(IRQ, 0);
+    if !handle_trap!(IRQ, 0) {
+        let handler = get_lower_aarch64_irq_handler();
+        handler();   
+    }
 }
 
 // /// deal with lower aarch64 interruption exception
