@@ -26,12 +26,6 @@ pub unsafe fn register_lower_aarch64_irq_handler(handler: VmExitHandler) {
     LOWER_AARCH64_IRQ_HANDLER = handler;
 }
 
-#[allow(dead_code)]
-fn get_lower_aarch64_irq_handler() -> VmExitHandler {
-    unsafe { LOWER_AARCH64_IRQ_HANDLER }
-}
-
-
 #[repr(u8)]
 #[derive(Debug)]
 #[allow(dead_code)]
@@ -65,33 +59,6 @@ fn invalid_exception_el2(tf: &mut TrapFrame, kind: TrapKind, source: TrapSource)
 #[no_mangle]
 fn handle_irq_exception(_tf: &TrapFrame) {
     if !handle_trap!(IRQ, 0) {
-        let handler = get_lower_aarch64_irq_handler();
-        handler();   
+        unsafe { LOWER_AARCH64_IRQ_HANDLER() };
     }
 }
-
-// /// deal with lower aarch64 interruption exception
-// #[no_mangle]
-// fn current_spxel_irq(ctx: &mut TrapFrame) {
-//     lower_aarch64_irq(ctx);
-// }
-
-// /// deal with lower aarch64 interruption exception
-// #[no_mangle]
-// fn lower_aarch64_irq(ctx: &mut TrapFrame) {
-//     let (irq, src) = gicc_get_current_irq();
-//     debug!("src {} id{}", src, irq);
-//     crate::trap::handle_irq_extern_hv(irq, src, ctx);
-// }
-
-// /// deal with lower aarch64 synchronous exception
-// #[no_mangle]
-// fn lower_aarch64_synchronous(tf: &mut TrapFrame) {
-//     debug!(
-//         "enter lower_aarch64_synchronous exception class:0x{:X}",
-//         exception_class()
-//     );
-//     // 0x16: hvc_handler
-//     // 0x24: data_abort_handler
-//     call_handler(exception_class(), tf);
-// }

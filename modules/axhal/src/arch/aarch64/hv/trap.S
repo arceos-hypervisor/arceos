@@ -67,14 +67,6 @@
     b       .Lexception_return_el2
 .endm
 
-.macro HANDLE_LOWER_IRQ
-.p2align 7
-    SAVE_REGS_EL2
-    ldr     x9, =LOWER_AARCH64_IRQ_HANDLER
-    ldr     x8, [x9]
-    blr     x8
-.endm
-
 .macro HANDLE_LOWER_SYNC
 .p2align 7
     SAVE_REGS_EL2

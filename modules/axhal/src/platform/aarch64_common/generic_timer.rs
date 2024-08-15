@@ -60,7 +60,7 @@ pub fn set_oneshot_timer(deadline_ns: u64) {
         }
     } else {
         unsafe {
-            core::arch::asm!("msr CNTHP_TVAL_EL2, {}", in(reg) 0);
+            core::arch::asm!("msr CNTHP_TVAL_EL2, {0:x}", in(reg) 0);
         }
     }
 }
@@ -105,8 +105,8 @@ pub(crate) fn init_percpu() {
         let ctl = 1;
         let tval = 0;
         unsafe {
-            core::arch::asm!("msr CNTHP_CTL_EL2, {}", in(reg) ctl);
-            core::arch::asm!("msr CNTHP_TVAL_EL2, {}", in(reg) tval);
+            core::arch::asm!("msr CNTHP_CTL_EL2, {0:x}", in(reg) ctl);
+            core::arch::asm!("msr CNTHP_TVAL_EL2, {0:x}", in(reg) tval);
         }
     }
     #[cfg(feature = "irq")]
