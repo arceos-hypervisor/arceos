@@ -41,6 +41,27 @@ unsafe extern "C" fn test_guest() -> ! {
     );
 }
 
+#[cfg(target_arch = "riscv64")]
+#[naked]
+unsafe extern "C" fn test_guest() -> ! {
+    core::arch::asm!(
+        "
+        li      a0, 2
+        li      a1, 3
+        li      a2, 3
+        li      a3, 3
+        li      a4, 4
+        li      a5, 5
+        li      a6, 6
+        li      a7, 0
+    2:
+        ecall
+        addi    a7, a7, 1
+        j       2b",
+        options(noreturn),
+    );
+}
+
 #[cfg_attr(feature = "axstd", no_mangle)]
 fn main() {
     println!("Hello, world!");
