@@ -1,8 +1,8 @@
 //! TODO: PLIC
 
 use crate::irq::IrqHandler;
-use lazyinit::LazyInit;
 use riscv::register::sie;
+use kspin::SpinNoIrq;
 
 /// `Interrupt` bit in `scause`
 pub(super) const INTC_IRQ_BASE: usize = 1 << (usize::BITS - 1);
@@ -17,7 +17,7 @@ pub(super) const S_TIMER: usize = INTC_IRQ_BASE + 5;
 /// Supervisor external interrupt in `scause`
 pub(super) const S_EXT: usize = INTC_IRQ_BASE + 9;
 
-static mut TIMER_HANDLER: IrqHandler = || {};
+static mut TIMER_HANDLER: SpinNoIrq<IrqHandler> = SpinNoIrq::new(|| {});
 
 /// The maximum number of IRQs.
 pub const MAX_IRQ_COUNT: usize = 1024;
@@ -51,7 +51,8 @@ pub fn register_handler(scause: usize, handler: IrqHandler) -> bool {
         scause,
         @TIMER => {
             unsafe{
-                TIMER_HANDLER = handler;
+                let mut timer_handler = TIMER_HANDLER.lock();
+                *timer_handler = handler;
             }
             true
         },
@@ -70,7 +71,9 @@ pub fn dispatch_irq(scause: usize) {
         @TIMER => {
             trace!("IRQ: timer");
             unsafe {
-                TIMER_HANDLER();
+                let mut timer_handler = TIMER_HANDLER.lock();
+                timer_handler();
+                // TIMER_HANDLER();
             }
         },
         @EXT => crate::irq::dispatch_irq_common(0), // TODO: get IRQ number from PLIC
