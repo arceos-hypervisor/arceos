@@ -1,8 +1,8 @@
 //! TODO: PLIC
 
 use crate::irq::IrqHandler;
-use riscv::register::sie;
 use kspin::SpinNoIrq;
+use riscv::register::sie;
 
 /// `Interrupt` bit in `scause`
 pub(super) const INTC_IRQ_BASE: usize = 1 << (usize::BITS - 1);
