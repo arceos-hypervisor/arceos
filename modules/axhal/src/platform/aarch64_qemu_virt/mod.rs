@@ -20,8 +20,6 @@ pub mod misc {
     pub use crate::platform::aarch64_common::psci::system_off as terminate;
 }
 
-//Todo: remove this, when hv is enabled, `exception_vector_base` is not used.
-#[cfg_attr(feature = "hv", allow(unused))]
 extern "C" {
     fn exception_vector_base();
     fn rust_main(cpu_id: usize, dtb: usize);
