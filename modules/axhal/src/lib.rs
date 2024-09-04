@@ -51,7 +51,7 @@ pub mod tls;
 pub mod irq;
 
 #[cfg(all(feature = "irq", target_arch = "aarch64"))]
-pub use platform::aarch64_common::gic::{GICD, GICC};
+pub use platform::aarch64_common::gic::{GICC, GICD};
 
 #[cfg(feature = "paging")]
 pub mod paging;
