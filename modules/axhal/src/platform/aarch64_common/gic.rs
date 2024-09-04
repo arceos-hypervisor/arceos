@@ -20,11 +20,11 @@ pub const UART_IRQ_NUM: usize = translate_irq(axconfig::UART_IRQ, InterruptType:
 const GICD_BASE: PhysAddr = PhysAddr::from(axconfig::GICD_PADDR);
 const GICC_BASE: PhysAddr = PhysAddr::from(axconfig::GICC_PADDR);
 
-static GICD: SpinNoIrq<GicDistributor> =
+pub static GICD: SpinNoIrq<GicDistributor> =
     SpinNoIrq::new(GicDistributor::new(phys_to_virt(GICD_BASE).as_mut_ptr()));
 
 // per-CPU, no lock
-static GICC: GicCpuInterface = GicCpuInterface::new(phys_to_virt(GICC_BASE).as_mut_ptr());
+pub static GICC: GicCpuInterface = GicCpuInterface::new(phys_to_virt(GICC_BASE).as_mut_ptr());
 
 /// Enables or disables the given IRQ.
 pub fn set_enable(irq_num: usize, enabled: bool) {
