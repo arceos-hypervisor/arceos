@@ -18,7 +18,7 @@ static mut BOOT_PT_L0: [A64PTE; 512] = [A64PTE::empty(); 512];
 static mut BOOT_PT_L1: [A64PTE; 512] = [A64PTE::empty(); 512];
 
 #[cfg(not(feature = "hv"))]
-unsafe fn switch_to_el1() {
+unsafe fn switch_to_elx() {
     SPSel.write(SPSel::SP::ELx);
     SP_EL0.set(0);
     let current_el = CurrentEL.read(CurrentEL::EL);
@@ -122,7 +122,7 @@ unsafe extern "C" fn _start() -> ! {
         add     x8, x8, {boot_stack_size}
         mov     sp, x8
 
-        bl      {switch_to_el1}         // switch to EL1
+        bl      {switch_to_elx}         // switch to EL1
         bl      {enable_fp}             // enable fp/neon
         bl      {init_boot_page_table}
         bl      {init_mmu}              // setup MMU
@@ -135,7 +135,7 @@ unsafe extern "C" fn _start() -> ! {
         ldr     x8, ={entry}
         blr     x8
         b      .",
-        switch_to_el1 = sym switch_to_el1,
+        switch_to_elx = sym switch_to_elx,
         init_boot_page_table = sym init_boot_page_table,
         init_mmu = sym init_mmu,
         enable_fp = sym enable_fp,
@@ -147,8 +147,60 @@ unsafe extern "C" fn _start() -> ! {
     )
 }
 
+#[cfg(feature = "hv")]
+#[naked]
+#[no_mangle]
+#[link_section = ".text.boot"]
+unsafe extern "C" fn _start() -> ! {
+    // PC = 0x8_0000
+    // X0 = dtb
+    core::arch::asm!("
+        // disable cache and MMU
+        mrs x1, sctlr_el2
+        bic x1, x1, #0xf
+        msr sctlr_el2, x1
+
+        // cache_invalidate(0): clear dl1$
+        mov x0, #0
+        bl  {cache_invalidate}
+        mov x0, #2
+        bl  {cache_invalidate}
+
+        mrs     x19, mpidr_el1
+        and     x19, x19, #0xffffff     // get current CPU id
+        mov     x20, x0                 // save DTB pointer
+
+        adrp    x8, {boot_stack}        // setup boot stack
+        add     x8, x8, {boot_stack_size}
+        mov     sp, x8
+
+        bl      {switch_to_elx}         // switch to EL1
+        bl      {enable_fp}             // enable fp/neon
+        bl      {init_boot_page_table}
+        bl      {init_mmu}
+
+        mov     x8, {phys_virt_offset}  // set SP to the high address
+        add     sp, sp, x8
+
+        mov     x0, x19                 // call rust_entry(cpu_id, dtb)
+        mov     x1, x20
+        ldr     x8, ={entry}
+        blr     x8
+        b      .",
+        cache_invalidate = sym cache_invalidate,
+        init_boot_page_table = sym init_boot_page_table,
+        init_mmu = sym init_mmu,
+        switch_to_elx = sym switch_to_elx,
+        enable_fp = sym enable_fp,
+        boot_stack = sym BOOT_STACK,
+        boot_stack_size = const TASK_STACK_SIZE,
+        phys_virt_offset = const axconfig::PHYS_VIRT_OFFSET,
+        entry = sym crate::platform::rust_entry,
+        options(noreturn),
+    );
+}
+
 /// The earliest entry point for the secondary CPUs.
-#[cfg(not(feature = "hv"))]
 #[cfg(feature = "smp")]
 #[naked]
 #[no_mangle]
@@ -159,7 +211,7 @@ unsafe extern "C" fn _start_secondary() -> ! {
         and     x19, x19, #0xffffff     // get current CPU id
 
         mov     sp, x0
-        bl      {switch_to_el1}
+        bl      {switch_to_elx}
         bl      {init_mmu}
         bl      {enable_fp}
 
@@ -170,7 +222,7 @@ unsafe extern "C" fn _start_secondary() -> ! {
         ldr     x8, ={entry}
         blr     x8
         b      .",
-        switch_to_el1 = sym switch_to_el1,
+        switch_to_elx = sym switch_to_elx,
         init_mmu = sym init_mmu,
         enable_fp = sym enable_fp,
         phys_virt_offset = const axconfig::PHYS_VIRT_OFFSET,
@@ -180,7 +232,7 @@ unsafe extern "C" fn _start_secondary() -> ! {
 }
 
 #[cfg(feature = "hv")]
-unsafe fn switch_to_el2() {
+unsafe fn switch_to_elx() {
     SPSel.write(SPSel::SP::ELx);
     let current_el = CurrentEL.read(CurrentEL::EL);
 
@@ -203,7 +255,7 @@ unsafe fn switch_to_el2() {
 }
 
 #[cfg(feature = "hv")]
-unsafe fn init_mmu_el2() {
+unsafe fn init_mmu() {
     // Set EL1 to 64bit.
     HCR_EL2.write(HCR_EL2::RW::EL1IsAarch64);
 
@@ -270,55 +322,3 @@ unsafe fn cache_invalidate(cache_level: usize) {
     );
 }
 
-#[cfg(feature = "hv")]
-#[naked]
-#[no_mangle]
-#[link_section = ".text.boot"]
-unsafe extern "C" fn _start() -> ! {
-    // PC = 0x8_0000
-    // X0 = dtb
-    core::arch::asm!("
-        // disable cache and MMU
-        mrs x1, sctlr_el2
-        bic x1, x1, #0xf
-        msr sctlr_el2, x1
-
-        // cache_invalidate(0): clear dl1$
-        mov x0, #0
-        bl  {cache_invalidate}
-        mov x0, #2
-        bl  {cache_invalidate}
-
-        mrs     x19, mpidr_el1
-        and     x19, x19, #0xffffff     // get current CPU id
-        mov     x20, x0                 // save DTB pointer
-
-        adrp    x8, {boot_stack}        // setup boot stack
-        add     x8, x8, {boot_stack_size}
-        mov     sp, x8
-
-        bl      {switch_to_el2}         // switch to EL1
-        bl      {enable_fp}             // enable fp/neon
-        bl      {init_boot_page_table}
-        bl      {init_mmu_el2}
-
-        mov     x8, {phys_virt_offset}  // set SP to the high address
-        add     sp, sp, x8
-
-        mov     x0, x19                 // call rust_entry(cpu_id, dtb)
-        mov     x1, x20
-        ldr     x8, ={entry}
-        blr     x8
-        b      .",
-        cache_invalidate = sym cache_invalidate,
-        init_boot_page_table = sym init_boot_page_table,
-        init_mmu_el2 = sym init_mmu_el2,
-        switch_to_el2 = sym switch_to_el2,
-        enable_fp = sym enable_fp,
-        boot_stack = sym BOOT_STACK,
-        boot_stack_size = const TASK_STACK_SIZE,
-        phys_virt_offset = const axconfig::PHYS_VIRT_OFFSET,
-        entry = sym crate::platform::rust_entry,
-        options(noreturn),
-    );
-}
