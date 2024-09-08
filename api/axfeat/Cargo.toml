@@ -13,7 +13,7 @@ documentation = "https://arceos-org.github.io/arceos/axfeat/index.html"
 default = []
 
 # Multicore
-smp = ["axhal/smp", "axruntime/smp", "kspin/smp"]
+smp = ["axhal/smp", "axruntime/smp", "axtask/smp", "kspin/smp"]
 
 # Floating point/SIMD
 fp_simd = ["axhal/fp_simd"]
@@ -57,7 +57,7 @@ driver-ixgbe = ["axdriver?/ixgbe"]
 driver-bcm2835-sdhci = ["axdriver?/bcm2835-sdhci"]
 
 #Hypervisor support 
-hv = ["axhal/hv"]
+hv = ["axhal/hv", "axruntime/hv"]
 
 # Logging
 log-level-off = ["axlog/log-level-off"]

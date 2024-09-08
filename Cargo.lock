@@ -511,6 +511,7 @@ dependencies = [
  "axconfig",
  "axhal",
  "axtask",
+ "bitmaps",
  "cfg-if",
  "crate_interface",
  "kernel_guard",

@@ -1,19 +1,22 @@
 use alloc::{boxed::Box, string::String, sync::Arc};
 use core::ops::Deref;
-use core::sync::atomic::{AtomicBool, AtomicI32, AtomicU64, AtomicU8, Ordering};
-use core::{alloc::Layout, cell::UnsafeCell, fmt, ptr::NonNull};
-
 #[cfg(feature = "preempt")]
 use core::sync::atomic::AtomicUsize;
+use core::sync::atomic::{AtomicBool, AtomicI32, AtomicU64, AtomicU8, AtomicUsize, Ordering};
+use core::{alloc::Layout, cell::UnsafeCell, fmt, ptr::NonNull};
+
+#[cfg(feature = "smp")]
+use bitmaps::Bitmap;
+use memory_addr::{align_up_4k, VirtAddr};
 
 #[cfg(feature = "tls")]
 use axhal::tls::TlsArea;
 
 use axhal::arch::TaskContext;
-use memory_addr::{align_up_4k, VirtAddr};
+use axhal::cpu::this_cpu_id;
 
 use crate::task_ext::AxTaskExt;
-use crate::{AxRunQueue, AxTask, AxTaskRef, WaitQueue};
+use crate::{AxTask, AxTaskRef, WaitQueue};
 
 /// A unique identifier for a thread.
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
@@ -38,6 +41,11 @@ pub struct TaskInner {
 
     entry: Option<*mut dyn FnOnce()>,
     state: AtomicU8,
+
+    #[cfg(feature = "smp")]
+    cpu_set: Bitmap<{ axconfig::SMP }>,
+    #[cfg(feature = "irq")]
+    irq_state: AtomicUsize,
 
     in_wait_queue: AtomicBool,
     #[cfg(feature = "irq")]
@@ -89,7 +97,19 @@ unsafe impl Sync for TaskInner {}
 
 impl TaskInner {
     /// Create a new task with the given entry function and stack size.
-    pub fn new<F>(entry: F, name: String, stack_size: usize) -> Self
+    /// The `cpu_set` represents a set of physical CPUs, which is implemented as a bit mask,
+    /// refering to `cpu_set_t` in Linux.
+    /// The task will be only scheduled on the specified CPUs if `cpu_set` is set as `Some(cpu_mask)`,
+    /// Otherwise, the task will be scheduled on all CPUs under specific load balancing policy.
+    /// Reference:
+    ///     * https://man7.org/linux/man-pages/man2/sched_setaffinity.2.html
+    ///     * https://man7.org/linux/man-pages/man3/CPU_SET.3.html
+    pub fn new<F>(
+        entry: F,
+        name: String,
+        stack_size: usize,
+        #[cfg(feature = "smp")] cpu_set: Option<usize>,
+    ) -> Self
     where
         F: FnOnce() + Send + 'static,
     {
@@ -108,6 +128,14 @@ impl TaskInner {
         if t.name == "idle" {
             t.is_idle = true;
         }
+        #[cfg(feature = "smp")]
+        {
+            t.cpu_set = match cpu_set {
+                Some(cpu_set) => Bitmap::from_value(cpu_set as _),
+                None => Bitmap::mask(axconfig::SMP),
+            };
+        }
+
         t
     }
 
@@ -164,6 +192,10 @@ impl TaskInner {
             is_init: false,
             entry: None,
             state: AtomicU8::new(TaskState::Ready as u8),
+            #[cfg(feature = "smp")]
+            cpu_set: Bitmap::new(),
+            #[cfg(feature = "irq")]
+            irq_state: AtomicUsize::new(0),
             in_wait_queue: AtomicBool::new(false),
             #[cfg(feature = "irq")]
             in_timer_list: AtomicBool::new(false),
@@ -192,6 +224,8 @@ impl TaskInner {
     pub(crate) fn new_init(name: String) -> Self {
         let mut t = Self::new_common(TaskId::new(), name);
         t.is_init = true;
+        #[cfg(feature = "smp")]
+        t.cpu_set.set(this_cpu_id(), true);
         if t.name == "idle" {
             t.is_idle = true;
         }
@@ -235,6 +269,24 @@ impl TaskInner {
     #[inline]
     pub(crate) const fn is_idle(&self) -> bool {
         self.is_idle
+    }
+
+    #[cfg(feature = "smp")]
+    #[inline]
+    pub(crate) const fn cpu_set(&self) -> Bitmap<{ axconfig::SMP }> {
+        self.cpu_set
+    }
+
+    #[cfg(feature = "irq")]
+    #[inline]
+    pub(crate) fn irq_state(&self) -> usize {
+        self.irq_state.load(Ordering::Acquire)
+    }
+
+    #[cfg(feature = "irq")]
+    #[inline]
+    pub(crate) fn set_irq_state(&self, value: usize) {
+        self.irq_state.store(value, Ordering::Release)
     }
 
     #[inline]
@@ -290,16 +342,17 @@ impl TaskInner {
     fn current_check_preempt_pending() {
         let curr = crate::current();
         if curr.need_resched.load(Ordering::Acquire) && curr.can_preempt(0) {
-            let mut rq = crate::RUN_QUEUE.lock();
+            let mut rq_locked = crate::current_run_queue().scheduler_lock().lock();
             if curr.need_resched.load(Ordering::Acquire) {
-                rq.preempt_resched();
+                rq_locked.preempt_resched();
             }
         }
     }
 
-    pub(crate) fn notify_exit(&self, exit_code: i32, rq: &mut AxRunQueue) {
+    /// Notify all tasks that join on this task.
+    pub(crate) fn notify_exit(&self, exit_code: i32) {
         self.exit_code.store(exit_code, Ordering::Release);
-        self.wait_for_exit.notify_all_locked(false, rq);
+        self.wait_for_exit.notify_all(false);
     }
 
     #[inline]
@@ -422,8 +475,7 @@ impl Deref for CurrentTask {
 }
 
 extern "C" fn task_entry() -> ! {
-    // release the lock that was implicitly held across the reschedule
-    unsafe { crate::RUN_QUEUE.force_unlock() };
+    // Enable irq (if feature "irq" is enabled) before running the task entry function.
     #[cfg(feature = "irq")]
     axhal::arch::enable_irqs();
     let task = crate::current();
