@@ -125,9 +125,9 @@ dependencies = [
 [[package]]
 name = "arm_gicv2"
 version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "47d25e73c949c69f75d1b9dba39c5475523403b31eb8c2fdc99da4dc33bc1aca"
+source = "git+https://github.com/arceos-hypervisor/arm_gicv2?rev=7acc0dd#7acc0dd1e1fefa90b4cd45342072d2350a74b071"
 dependencies = [
+ "crate_interface",
  "tock-registers",
 ]
 
@@ -376,6 +376,7 @@ dependencies = [
  "bitflags 2.6.0",
  "cfg-if",
  "cortex-a",
+ "crate_interface",
  "dw_apb_uart",
  "handler_table",
  "int_ratio",
