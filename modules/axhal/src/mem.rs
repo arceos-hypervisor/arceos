@@ -115,7 +115,7 @@ fn kernel_image_regions() -> impl Iterator<Item = MemRegion> {
 /// Returns the default MMIO memory regions (from [`axconfig::MMIO_REGIONS`]).
 #[allow(dead_code)]
 pub(crate) fn default_mmio_regions() -> impl Iterator<Item = MemRegion> {
-    axconfig::MMIO_REGIONS.iter().map(|reg| MemRegion {
+    let mmio_regions = axconfig::MMIO_REGIONS.iter().map(|reg| MemRegion {
         paddr: reg.0.into(),
         size: reg.1,
         flags: MemRegionFlags::RESERVED
@@ -123,7 +123,15 @@ pub(crate) fn default_mmio_regions() -> impl Iterator<Item = MemRegion> {
             | MemRegionFlags::READ
             | MemRegionFlags::WRITE,
         name: "mmio",
-    })
+    });
+
+    //reserve 0-4G range mem as DMA memory used id map ipa  
+    mmio_regions.chain(core::iter::once(MemRegion {
+        paddr: PhysAddr::from(0x9400000),
+        size: 0xe6c00000,
+        flags: MemRegionFlags::RESERVED| MemRegionFlags::READ | MemRegionFlags::WRITE,
+        name: "free memory",
+    }))
 }
 
 /// Returns the default free memory regions (kernel image end to physical memory end).
@@ -131,12 +139,20 @@ pub(crate) fn default_mmio_regions() -> impl Iterator<Item = MemRegion> {
 pub(crate) fn default_free_regions() -> impl Iterator<Item = MemRegion> {
     let start = virt_to_phys((_ekernel as usize).into()).align_up_4k();
     let end = PhysAddr::from(axconfig::PHYS_MEMORY_END).align_down_4k();
-    core::iter::once(MemRegion {
+    [
+        MemRegion {
         paddr: start,
         size: end.as_usize() - start.as_usize(),
         flags: MemRegionFlags::FREE | MemRegionFlags::READ | MemRegionFlags::WRITE,
         name: "free memory",
-    })
+    },
+    MemRegion {
+        paddr: PhysAddr::from(0x1f0000000),
+        size: 0x10000000,
+        flags: MemRegionFlags::FREE | MemRegionFlags::READ | MemRegionFlags::WRITE,
+        name: "free memory",
+    }
+    ].into_iter()
 }
 
 /// Fills the `.bss` section with zeros.

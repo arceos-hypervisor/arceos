@@ -157,6 +157,7 @@ pub extern "C" fn rust_main(cpu_id: usize, dtb: usize) -> ! {
     {
         #[allow(unused_variables)]
         let all_devices = axdriver::init_drivers();
+        debug!("init driviers Ok");
 
         #[cfg(feature = "fs")]
         axfs::init_filesystems(all_devices.block);

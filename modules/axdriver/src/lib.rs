@@ -129,6 +129,7 @@ impl AllDevices {
                 self.add_device(dev);
             }
         });
+        debug!("axdrivers: probe finished.");
 
         self.probe_bus_devices();
     }
