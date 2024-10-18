@@ -20,14 +20,12 @@ fn resolve_config_path(platform: Option<&str>) -> Result<PathBuf> {
     let path = match platform {
         None | Some("") => "defconfig.toml".into(),
         Some(plat) if builtin_platforms.contains(&plat.to_string()) => {
-            if cfg!(feature = "hv" ) {
-                config_dir.join(format!("{plat}-hv.toml"))
-            }else {
-                config_dir.join(format!("{plat}.toml"))
-            }
+            config_dir.join(format!("{plat}.toml"))
         }
         Some(plat) => {
-            let path = PathBuf::from(&plat);
+            let plat_path = std::env::var("AX_PLATFORM_PATH").unwrap_or(plat.to_string());
+            let path = PathBuf::from(&plat_path);
+            println!("Using custom platform config file: {}", path.display());
             if path.is_absolute() {
                 path
             } else {

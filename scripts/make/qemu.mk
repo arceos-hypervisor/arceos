@@ -62,10 +62,6 @@ ifeq ($(GRAPHIC), n)
   qemu_args-y += -nographic
 endif
 
-ifeq ($(ARCH), aarch64)
-  qemu_args-$(HV) += -machine virtualization=on,gic-version=2
-endif
-
 ifeq ($(QEMU_LOG), y)
   qemu_args-y += -D qemu.log -d in_asm,int,mmu,pcall,cpu_reset,guest_errors
 endif
