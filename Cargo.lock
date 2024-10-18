@@ -173,7 +173,7 @@ dependencies = [
  "cfg-if",
  "kspin",
  "log",
- "memory_addr 0.3.1",
+ "memory_addr",
 ]
 
 [[package]]
@@ -207,7 +207,7 @@ dependencies = [
  "axmm",
  "kspin",
  "log",
- "memory_addr 0.3.1",
+ "memory_addr",
 ]
 
 [[package]]
@@ -385,7 +385,7 @@ dependencies = [
  "lazyinit",
  "linkme",
  "log",
- "memory_addr 0.2.1",
+ "memory_addr",
  "page_table_entry",
  "page_table_multiarch",
  "percpu",
@@ -443,7 +443,7 @@ dependencies = [
  "kspin",
  "lazyinit",
  "log",
- "memory_addr 0.3.1",
+ "memory_addr",
 ]
 
 [[package]]
@@ -519,7 +519,7 @@ dependencies = [
  "kspin",
  "lazyinit",
  "log",
- "memory_addr 0.3.1",
+ "memory_addr",
  "percpu",
  "rand",
  "scheduler",
@@ -1043,12 +1043,6 @@ checksum = "2dffe52ecf27772e601905b7522cb4ef790d2cc203488bbd0e2fe85fcb74566d"
 
 [[package]]
 name = "memory_addr"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4c59c2ac537a8198f50fe22e8783bdbef2011cd133d5c03748d1e5bc85c9fc4d"
-
-[[package]]
-name = "memory_addr"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6f769efcf10b9dfb4c913bebb409cda77b1a3f072b249bf5465e250bcb30eb49"
@@ -1092,7 +1086,7 @@ checksum = "4d911cfe86a8529a3fabfafa39a857a57cb8d00046ddca14fa609b289303bc7c"
 dependencies = [
  "aarch64-cpu",
  "bitflags 2.6.0",
- "memory_addr 0.3.1",
+ "memory_addr",
  "x86_64 0.15.1",
 ]
 
@@ -1103,7 +1097,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "43068c68a7fee18c1749befb515f69f6b1fcc18a4908e0d96e64fc51258d301a"
 dependencies = [
  "log",
- "memory_addr 0.3.1",
+ "memory_addr",
  "page_table_entry",
  "riscv",
  "x86",
