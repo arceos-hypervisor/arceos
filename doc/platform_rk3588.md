@@ -1,6 +1,8 @@
 # How to run ArceOS on rk3588
 
-Use Command `make ARCH=aarch64 PLATFORM=aarch64-rk3588j A=(pwd)/examples/helloworld kernel` to build the kernel image.
-Then use the flash tool to write the generated `boot.img` to the rk3588 platform, and Arceos will be able to boot.
+1. Use Command `make ARCH=aarch64 PLATFORM=aarch64-rk3588j A=$(pwd)/examples/helloworld kernel` to build the kernel image `boot.img`.
+2. Download the [RKDevTool](https://download.t-firefly.com/product/Board/RK3588/Tool/Window/RKDevTool_Release_v3.31.zip).
+3. Set the path of `boot.img` in **boot** and connect the rk3588 board.
+4. Press the `Run` button to flash the image to the rk3588 board.
 
-
+![RKDevTool](./figures/RKDevTool3.3.png)
