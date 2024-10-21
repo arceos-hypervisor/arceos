@@ -1,4 +1,5 @@
 pub mod mem;
+pub mod dw_apb_uart;
 
 #[cfg(feature = "smp")]
 pub mod mp;
@@ -9,7 +10,7 @@ pub mod irq {
 }
 
 pub mod console {
-    pub use crate::platform::aarch64_common::dw_apb_uart::*;
+    pub use super::dw_apb_uart::*;
 }
 
 pub mod time {
@@ -33,7 +34,7 @@ pub(crate) unsafe extern "C" fn rust_entry(cpu_id: usize, dtb: usize) {
     #[cfg(not(feature = "hv"))]
     crate::arch::write_page_table_root0(0.into()); // disable low address access
     crate::cpu::init_primary(cpu_id);
-    super::aarch64_common::dw_apb_uart::init_early();
+    super::dw_apb_uart::init_early();
     super::aarch64_common::generic_timer::init_early();
     rust_main(cpu_id, dtb);
 }
