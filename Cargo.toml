@@ -28,6 +28,7 @@ members = [
     "examples/httpserver",
     "examples/httpserver",
     "examples/shell",
+    "examples/smp",
 ]
 
 [workspace.package]

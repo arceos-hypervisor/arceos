@@ -1,0 +1,6 @@
+[package]
+name = "arceos-smp"
+edition = "2021"
+
+[dependencies]
+axstd = { workspace = true, features = ["multitask"], optional = true }
