@@ -1,5 +1,5 @@
-pub mod mem;
 pub mod dw_apb_uart;
+pub mod mem;
 
 #[cfg(feature = "smp")]
 pub mod mp;
