@@ -55,7 +55,6 @@ pub fn platform_init() {
     #[cfg(feature = "irq")]
     super::aarch64_common::gic::init_primary();
     super::aarch64_common::generic_timer::init_percpu();
-    // super::aarch64_common::dw_apb_uart::init();
 }
 
 /// Initializes the platform devices for secondary CPUs.
