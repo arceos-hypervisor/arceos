@@ -253,7 +253,10 @@ fn init_interrupt() {
     }
 
     axhal::irq::register_handler(TIMER_IRQ_NUM, || {
+        // arch 
         update_timer();
+
+        // axtask
         #[cfg(feature = "multitask")]
         axtask::on_timer_tick();
     });
