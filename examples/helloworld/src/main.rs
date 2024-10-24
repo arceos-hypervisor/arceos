@@ -1,6 +1,7 @@
 #![cfg_attr(feature = "axstd", no_std)]
 #![cfg_attr(feature = "axstd", no_main)]
 #![feature(naked_functions)]
+#![feature(asm_const)]
 
 #[cfg(feature = "axstd")]
 use axstd::println;
@@ -53,14 +54,19 @@ unsafe extern "C" fn test_guest() -> ! {
         li      a4, 4
         li      a5, 5
         li      a6, 6
-        li      a7, 0
+        li      a7, {hvc}
     2:
         ecall
-        addi    a7, a7, 1
+        addi    a6, a6, 1
         j       2b",
+        hvc = const EID_HVC,
         options(noreturn),
     );
 }
+
+/// Extension ID for hypercall,
+/// defined in [riscv_vcpu](https://github.com/arceos-hypervisor/riscv_vcpu) crate.
+pub const EID_HVC: usize = 0x485643; // "HVC" in ASCII
 
 #[cfg_attr(feature = "axstd", no_mangle)]
 fn main() {
