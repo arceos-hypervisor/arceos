@@ -10,15 +10,18 @@ repository = "https://github.com/arceos-org/arceos/tree/main/modules/axfs"
 documentation = "https://arceos-org.github.io/arceos/axfs/index.html"
 
 [features]
+fs = []
 devfs = ["dep:axfs_devfs"]
 ramfs = ["dep:axfs_ramfs"]
 procfs = ["dep:axfs_ramfs"]
 sysfs = ["dep:axfs_ramfs"]
-fatfs = ["dep:fatfs"]
 myfs = ["dep:crate_interface"]
 use-ramdisk = []
 
-default = ["devfs", "ramfs", "fatfs", "procfs", "sysfs"]
+ext4_rs = ["dep:ext4_rs", "fs"]
+fatfs = ["dep:fatfs", "fs"]
+
+default = ["fs", "devfs", "ramfs", "procfs", "sysfs"]
 
 [dependencies]
 log = "=0.4.21"
@@ -33,6 +36,7 @@ axfs_ramfs = { version = "0.1", optional = true }
 crate_interface = { version = "0.1", optional = true }
 axsync = { workspace = true }
 axdriver = { workspace = true, features = ["block"] }
+ext4_rs = { git = "https://github.com/yuoo655/ext4_rs.git", rev= "6bcc7f5", optional = true }
 axdriver_block = { git = "https://github.com/arceos-org/axdriver_crates.git", tag = "v0.1.0" }
 
 [dependencies.fatfs]
