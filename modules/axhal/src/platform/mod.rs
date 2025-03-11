@@ -28,7 +28,11 @@ cfg_if::cfg_if! {
     } else if #[cfg(all(target_arch = "aarch64", platform_family = "aarch64-rk3588j"))] {
         mod aarch64_rk3588j;
         pub use self::aarch64_rk3588j::*;
-    } else {
+    // } else if #[cfg(all(target_arch = "x86_64", platform_family = "x86-linux"))] {
+    } else if #[cfg(all(target_arch = "x86_64"))] {
+        mod x86_linux;
+        pub use self::x86_linux::*;
+    }else {
         mod dummy;
         pub use self::dummy::*;
     }

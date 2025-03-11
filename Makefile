@@ -131,6 +131,7 @@ APP_NAME := $(shell basename $(APP))
 LD_SCRIPT := $(TARGET_DIR)/$(TARGET)/$(MODE)/linker_$(PLAT_NAME).lds
 OUT_ELF := $(OUT_DIR)/$(APP_NAME)_$(PLAT_NAME).elf
 OUT_BIN := $(OUT_DIR)/$(APP_NAME)_$(PLAT_NAME).bin
+OUT_ASM := $(OUT_DIR)/$(APP_NAME)_$(PLAT_NAME).asm
 
 all: build
 
@@ -152,7 +153,7 @@ defconfig: _axconfig-gen
 oldconfig: _axconfig-gen
 	$(call oldconfig)
 
-build: $(OUT_DIR) $(OUT_BIN)
+build: $(OUT_DIR) $(OUT_BIN) $(OUT_ASM)
 
 disasm:
 	$(OBJDUMP) $(OUT_ELF) | less

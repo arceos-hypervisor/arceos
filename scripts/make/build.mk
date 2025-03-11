@@ -52,4 +52,7 @@ $(OUT_DIR):
 $(OUT_BIN): _cargo_build $(OUT_ELF)
 	$(call run_cmd,$(OBJCOPY),$(OUT_ELF) --strip-all -O binary $@)
 
+$(OUT_ASM): $(OUT_BIN)
+	$(call run_cmd,$(OBJDUMP),$(OUT_ELF) > $(OUT_ASM))
+
 .PHONY: _cargo_build

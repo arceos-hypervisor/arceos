@@ -463,6 +463,7 @@ dependencies = [
  "riscv",
  "riscv_goldfish",
  "sbi-rt",
+ "spin",
  "static_assertions",
  "tock-registers",
  "x2apic",
@@ -551,6 +552,7 @@ dependencies = [
  "chrono",
  "crate_interface",
  "kernel_guard",
+ "lazyinit",
  "percpu",
 ]
 

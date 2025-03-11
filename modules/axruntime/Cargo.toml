@@ -41,3 +41,4 @@ percpu = { version = "0.1.4", optional = true }
 kernel_guard = { version = "0.1", optional = true }
 
 chrono = { version = "0.4.38", default-features = false }
+lazyinit = "0.2"

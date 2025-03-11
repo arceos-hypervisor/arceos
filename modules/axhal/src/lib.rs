@@ -76,3 +76,6 @@ pub use self::platform::platform_init;
 
 #[cfg(feature = "smp")]
 pub use self::platform::platform_init_secondary;
+
+pub use self::platform::mem::host_memory_regions;
+pub use self::platform::vmm_platform_init;
