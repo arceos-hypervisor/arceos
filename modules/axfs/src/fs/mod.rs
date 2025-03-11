@@ -1,12 +1,12 @@
 cfg_if::cfg_if! {
     if #[cfg(feature = "myfs")] {
         pub mod myfs;
-    } else if #[cfg(feature = "fatfs")] {
-        pub mod fatfs;
     } else if #[cfg(feature = "ext4_rs")] {
         pub mod ext4_rs;
         pub use ext4_rs::BLOCK_SIZE;
-    } 
+    } else if #[cfg(feature = "fatfs")] {
+        pub mod fatfs;
+    }
 }
 
 #[cfg(feature = "devfs")]

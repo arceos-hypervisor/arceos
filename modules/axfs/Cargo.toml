@@ -21,7 +21,7 @@ use-ramdisk = []
 ext4_rs = ["dep:ext4_rs", "fs"]
 fatfs = ["dep:fatfs", "fs"]
 
-default = ["fs", "devfs", "ramfs", "procfs", "sysfs"]
+default = ["fs", "fatfs","devfs", "ramfs", "procfs", "sysfs"]
 
 [dependencies]
 log = "=0.4.21"
