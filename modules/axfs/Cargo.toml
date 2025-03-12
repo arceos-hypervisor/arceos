@@ -17,7 +17,7 @@ sysfs = ["dep:axfs_ramfs"]
 myfs = ["dep:crate_interface"]
 use-ramdisk = []
 
-ext4fs = ["dep:ext4_rs"]
+ext4fs = ["dep:another_ext4"]
 fatfs = ["dep:fatfs"]
 
 default = ["devfs", "ramfs", "fatfs", "procfs", "sysfs"]
@@ -35,7 +35,7 @@ axfs_ramfs = { version = "0.1", optional = true }
 crate_interface = { version = "0.1", optional = true }
 axsync = { workspace = true }
 axdriver = { workspace = true, features = ["block"] }
-ext4_rs = { git = "https://github.com/yuoo655/ext4_rs.git", rev= "6bcc7f5", optional = true }
+another_ext4 = { git = "https://github.com/Starry-OS/ljx_ext4.git", branch = "main", features = ["block_cache"], optional = true }
 axdriver_block = { git = "https://github.com/arceos-org/axdriver_crates.git", tag = "v0.1.0" }
 
 [dependencies.fatfs]

@@ -48,6 +48,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "another_ext4"
+version = "0.1.0"
+source = "git+https://github.com/Starry-OS/ljx_ext4.git?branch=main#ae00f9ed9ca9fe81e608a419f85eacb922bde816"
+dependencies = [
+ "bitflags 2.6.0",
+ "log",
+ "spin",
+]
+
+[[package]]
 name = "anstream"
 version = "0.6.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -382,6 +392,7 @@ dependencies = [
 name = "axfs"
 version = "0.1.0"
 dependencies = [
+ "another_ext4",
  "axdriver",
  "axdriver_block",
  "axerrno",
@@ -394,7 +405,6 @@ dependencies = [
  "cap_access",
  "cfg-if",
  "crate_interface",
- "ext4_rs",
  "fatfs",
  "lazyinit",
  "log",
@@ -909,15 +919,6 @@ name = "equivalent"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5443807d6dff69373d433ab9ef5378ad8df50ca6298caf15de6e52e24aaf54d5"
-
-[[package]]
-name = "ext4_rs"
-version = "1.0.0"
-source = "git+https://github.com/yuoo655/ext4_rs.git?rev=6bcc7f5#6bcc7f5d6382ba1940f29f9a15869f35fe77b5c0"
-dependencies = [
- "bitflags 2.6.0",
- "log",
-]
 
 [[package]]
 name = "fatfs"

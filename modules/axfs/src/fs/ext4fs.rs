@@ -1,16 +1,14 @@
 use crate::dev::Disk;
 use alloc::sync::Arc;
-use alloc::vec;
-use alloc::vec::*;
+use another_ext4::{
+    BLOCK_SIZE as EXT4_BLOCK_SIZE, Block, BlockDevice, EXT4_ROOT_INO, ErrCode as Ext4ErrorCode,
+    Ext4, Ext4Error, FileType as EXt4FileType, InodeMode as Ext4InodeMode,
+};
 use axfs_vfs::{VfsDirEntry, VfsError, VfsNodePerm, VfsResult};
 use axfs_vfs::{VfsNodeAttr, VfsNodeOps, VfsNodeRef, VfsNodeType, VfsOps};
 use axsync::Mutex;
-use core::cell::RefCell;
-use ext4_rs::*;
 
-pub struct DiskAdapter {
-    inner: RefCell<Disk>,
-}
+pub struct DiskAdapter(Arc<Mutex<Disk>>);
 
 unsafe impl Send for DiskAdapter {}
 unsafe impl Sync for DiskAdapter {}
@@ -19,282 +17,186 @@ unsafe impl Sync for DiskAdapter {}
 const DISK_BLOCK_SIZE: usize = 512;
 
 // The block size of the file system
-pub const BLOCK_SIZE: usize = 4096;
+pub const BLOCK_SIZE: usize = EXT4_BLOCK_SIZE;
 
 impl BlockDevice for DiskAdapter {
-    fn read_offset(&self, offset: usize) -> Vec<u8> {
-        let mut disk = self.inner.borrow_mut();
-        let mut buf = vec![0u8; BLOCK_SIZE];
-        
-        // Set the disk cursor to the requested offset
-        disk.set_position(offset as u64);
-        
-        // Read data into the buffer
-        let mut bytes_read = 0;
-        while bytes_read < BLOCK_SIZE {
-            let read_result = disk.read_one(&mut buf[bytes_read..]);
-            match read_result {
-                Ok(n) => {
-                    bytes_read += n;
-                    if n == 0 { break; } // Exit the loop if no data was read
-                },
-                Err(_) => panic!("Error reading from disk"),
-            }
+    fn read_block(&self, block_id: u64) -> Block {
+        let mut disk = self.0.lock();
+        let base = block_id as usize * EXT4_BLOCK_SIZE;
+        let mut data = [0u8; EXT4_BLOCK_SIZE];
+
+        // Per-disk-block read using set_position and read_one
+        for i in 0..(EXT4_BLOCK_SIZE / DISK_BLOCK_SIZE) {
+            let offset = base + i * DISK_BLOCK_SIZE;
+            disk.set_position(offset as u64);
+
+            let mut dblock = [0u8; DISK_BLOCK_SIZE];
+            disk.read_one(&mut dblock).unwrap();
+
+            data[i * DISK_BLOCK_SIZE..(i + 1) * DISK_BLOCK_SIZE].copy_from_slice(&dblock);
         }
-        
-        buf
+
+        Block::new(block_id, data)
     }
 
-    fn write_offset(&self, offset: usize, buf: &[u8]) {
-        let mut disk = self.inner.borrow_mut();
-        
-        if buf.len() != BLOCK_SIZE {
-            panic!("Buffer length must be equal to BLOCK_SIZE");
-        }
-        
-        // Set the disk cursor to the requested offset
-        disk.set_position(offset as u64);
-        
-        // Write data to the disk
-        let mut bytes_written = 0;
-        while bytes_written < buf.len() {
-            let write_result = disk.write_one(&buf[bytes_written..]);
-            match write_result {
-                Ok(n) => {
-                    bytes_written += n;
-                    if n == 0 { break; } // Exit the loop if no data was written
-                },
-                Err(_) => panic!("Error writing to disk"),
-            }
-        }
-        
-        if bytes_written != buf.len() {
-            panic!("Failed to write all data");
+    fn write_block(&self, block: &Block) {
+        let mut disk = self.0.lock();
+        let base = block.id as usize * EXT4_BLOCK_SIZE;
+
+        // Per-disk-block write using set_position and write_one
+        for i in 0..(EXT4_BLOCK_SIZE / DISK_BLOCK_SIZE) {
+            let offset = base + i * DISK_BLOCK_SIZE;
+            disk.set_position(offset as u64);
+
+            let dblock = &block.data[i * DISK_BLOCK_SIZE..(i + 1) * DISK_BLOCK_SIZE];
+            disk.write_one(dblock).unwrap();
         }
     }
 }
-
-pub struct Ext4FileSystem {
-    #[allow(unused)]
-    inner: Arc<Ext4>,
-    root_dir: VfsNodeRef,
-}
+pub struct Ext4FileSystem(Arc<Ext4>);
 
 impl Ext4FileSystem {
     pub fn new(disk: Disk) -> Self {
-        let block_device = Arc::new(DiskAdapter {
-            inner: RefCell::new(disk),
-        });
-        let inner = Ext4::open(block_device);
-        let root = Arc::new(Ext4FileWrapper::new(inner.clone()));
-        Self {
-            inner: inner.clone(),
-            root_dir: root,
-        }
+        let block_device = Arc::new(DiskAdapter(Arc::new(Mutex::new(disk))));
+        let ext4 = Ext4::load(block_device).expect("Failed to load ext4 filesystem");
+        log::info!("Ext4 filesystem loaded");
+        Self(Arc::new(ext4))
     }
 }
 
 impl VfsOps for Ext4FileSystem {
     fn root_dir(&self) -> VfsNodeRef {
-        Arc::clone(&self.root_dir)
+        Arc::new(Ext4VirtInode::new(EXT4_ROOT_INO, self.0.clone()))
     }
-
     fn umount(&self) -> VfsResult {
-        log::info!("umount:");
-        todo!()
+        self.0.flush_all();
+        Ok(())
     }
 }
 
-pub struct Ext4FileWrapper {
-    ext4_file: Mutex<Ext4File>,
-    ext4: Arc<Ext4>,
+pub struct Ext4VirtInode {
+    id: u32,
+    fs: Arc<Ext4>,
 }
 
-unsafe impl Send for Ext4FileWrapper {}
-unsafe impl Sync for Ext4FileWrapper {}
+unsafe impl Send for Ext4VirtInode {}
+unsafe impl Sync for Ext4VirtInode {}
 
-impl Ext4FileWrapper {
-    fn new(ext4: Arc<Ext4>) -> Self {
-        Self {
-            ext4_file: Mutex::new(Ext4File::new()),
-            ext4: ext4,
-        }
+impl Ext4VirtInode {
+    fn new(id: u32, fs: Arc<Ext4>) -> Self {
+        log::trace!("Create Ext4VirtInode {}", id);
+        Self { id, fs }
     }
 }
 
-impl VfsNodeOps for Ext4FileWrapper {
-    /// Do something when the node is opened.
+impl VfsNodeOps for Ext4VirtInode {
     fn open(&self) -> VfsResult {
-        // log::info!("opening file");
-        // let mut ext4_file = self.ext4_file.lock();
-        // let r = self.ext4.ext4_open(&mut ext4_file, path, "r+", false);
         Ok(())
     }
 
-    /// Do something when the node is closed.
     fn release(&self) -> VfsResult {
         Ok(())
     }
 
-    /// Get the attributes of the node.
     fn get_attr(&self) -> VfsResult<VfsNodeAttr> {
-        let ext4_file = self.ext4_file.lock();
-        let root_inode_ref =
-            Ext4InodeRef::get_inode_ref(Arc::downgrade(&self.ext4).clone(), ext4_file.inode);
-        let inode_mode = root_inode_ref.inner.inode.mode;
-        let size = ext4_file.fsize;
-        // BLOCK_SIZE / DISK_BLOCK_SIZE
-        let blocks = root_inode_ref.inner.inode.blocks * 8;
-        let (ty, perm) = map_imode(inode_mode as u16);
-        drop(ext4_file);
-        Ok(VfsNodeAttr::new(perm, ty, size as _, blocks as _))
+        self.fs
+            .getattr(self.id)
+            .map(|attr| {
+                VfsNodeAttr::new(
+                    map_perm(attr.perm),
+                    map_type(attr.ftype),
+                    attr.size,
+                    attr.blocks,
+                )
+            })
+            .map_err(map_error)
     }
 
     // file operations:
 
-    /// Read data from the file at the given offset.
     fn read_at(&self, offset: u64, buf: &mut [u8]) -> VfsResult<usize> {
-        let mut ext4_file = self.ext4_file.lock();
-        ext4_file.fpos = offset as usize;
-
-        let read_len = buf.len();
-        let mut read_cnt = 0;
-
-        let r = self
-            .ext4
-            .ext4_file_read(&mut ext4_file, buf, read_len, &mut read_cnt);
-
-        if let Err(e) = r {
-            match e.error() {
-                Errnum::EINVAL => {
-                    drop(ext4_file);
-                    Ok(0)
-                }
-                _ => {
-                    drop(ext4_file);
-                    Err(VfsError::InvalidInput)
-                }
-            }
-        } else {
-            drop(ext4_file);
-            Ok(read_len)
-        }
+        self.fs
+            .read(self.id, offset as usize, buf)
+            .map_err(map_error)
     }
 
-    /// Write data to the file at the given offset.
     fn write_at(&self, offset: u64, buf: &[u8]) -> VfsResult<usize> {
-        let mut ext4_file = self.ext4_file.lock();
-        ext4_file.fpos = offset as usize;
-
-        let write_size = buf.len();
-
-        self.ext4.ext4_file_write(&mut ext4_file, &buf, write_size);
-
-        Ok(write_size)
+        self.fs
+            .write(self.id, offset as usize, buf)
+            .map_err(map_error)
     }
 
-    /// Flush the file, synchronize the data to disk.
     fn fsync(&self) -> VfsResult {
-        todo!()
+        Ok(())
     }
 
-    /// Truncate the file to the given size.
-    fn truncate(&self, _size: u64) -> VfsResult {
-        todo!()
+    fn truncate(&self, size: u64) -> VfsResult {
+        // TODO: Simple implementation, just set the size,
+        // not truncate the file in the disk
+        self.fs
+            .setattr(
+                self.id,
+                None,
+                None,
+                None,
+                Some(size),
+                None,
+                None,
+                None,
+                None,
+            )
+            .map_err(map_error)
     }
 
     // directory operations:
 
-    /// Get the parent directory of this directory.
-    ///
-    /// Return `None` if the node is a file.
     fn parent(&self) -> Option<VfsNodeRef> {
-        None
+        self.fs.lookup(self.id, "..").map_or(None, |parent| {
+            Some(Arc::new(Ext4VirtInode::new(parent, self.fs.clone())))
+        })
     }
 
-    /// Lookup the node with given `path` in the directory.
-    ///
-    /// Return the node if found.
     fn lookup(self: Arc<Self>, path: &str) -> VfsResult<VfsNodeRef> {
-        let mut ext4_file = self.ext4_file.lock();
-        let r = self.ext4.ext4_open(&mut ext4_file, path, "r+", false);
-
-        if let Err(e) = r {
-            match e.error() {
-                Errnum::ENOENT => Err(VfsError::NotFound),
-                Errnum::EALLOCFIAL => Err(VfsError::InvalidInput),
-                Errnum::ELINKFIAL => Err(VfsError::InvalidInput),
-
-                _ => Err(VfsError::InvalidInput),
-            }
-        } else {
-            drop(ext4_file);
-            // log::error!("file found");
-            Ok(self.clone())
+        match self.fs.generic_lookup(self.id, path) {
+            Ok(id) => Ok(Arc::new(Ext4VirtInode::new(id, self.fs.clone()))),
+            Err(e) => Err(map_error(e)),
         }
     }
 
-    /// Create a new node with the given `path` in the directory
-    ///
-    /// Return [`Ok(())`](Ok) if it already exists.
     fn create(&self, path: &str, ty: VfsNodeType) -> VfsResult {
-        let types = match ty {
-            VfsNodeType::Fifo => DirEntryType::EXT4_DE_FIFO,
-            VfsNodeType::CharDevice => DirEntryType::EXT4_DE_CHRDEV,
-            VfsNodeType::Dir => DirEntryType::EXT4_DE_DIR,
-            VfsNodeType::BlockDevice => DirEntryType::EXT4_DE_BLKDEV,
-            VfsNodeType::File => DirEntryType::EXT4_DE_REG_FILE,
-            VfsNodeType::SymLink => DirEntryType::EXT4_DE_SYMLINK,
-            VfsNodeType::Socket => DirEntryType::EXT4_DE_SOCK,
-        };
-
-        let mut ext4file = self.ext4_file.lock();
-
-        if types == DirEntryType::EXT4_DE_DIR {
-            let _ = self.ext4.ext4_dir_mk(path);
-        } else {
-            let _ = self.ext4.ext4_open(&mut ext4file, path, "w+", true);
+        if self.fs.generic_lookup(self.id, path).is_ok() {
+            return Ok(());
         }
-
-        drop(ext4file);
-
-        Ok(())
+        let mode = Ext4InodeMode::from_type_and_perm(map_type_inv(ty), Ext4InodeMode::ALL_RWX);
+        self.fs
+            .generic_create(self.id, path, mode)
+            .map(|_| ())
+            .map_err(map_error)
     }
 
-    /// Remove the node with the given `path` in the directory.
-    fn remove(&self, _path: &str) -> VfsResult {
-        todo!()
+    fn remove(&self, path: &str) -> VfsResult {
+        self.fs.unlink(self.id, path).map_err(map_error)
     }
 
-    /// Read directory entries into `dirents`, starting from `start_idx`.
     fn read_dir(&self, start_idx: usize, dirents: &mut [VfsDirEntry]) -> VfsResult<usize> {
-        let ext4_file = self.ext4_file.lock();
-        let inode_num = ext4_file.inode;
-        let entries: Vec<Ext4DirEntry> = self.ext4.read_dir_entry(inode_num as _);
-        let mut iter = entries.into_iter().skip(start_idx);
-
-        for (i, out_entry) in dirents.iter_mut().enumerate() {
-            let x: Option<Ext4DirEntry> = iter.next();
-            match x {
-                Some(ext4direntry) => {
-                    let name = ext4direntry.name;
-                    let name_len = ext4direntry.name_len;
-                    let file_type = unsafe { ext4direntry.inner.inode_type };
-                    let (ty, _) = map_dir_imode(file_type as u16);
-                    let name = get_name(name, name_len as usize).unwrap();
-                    *out_entry = VfsDirEntry::new(name.as_str(), ty);
+        self.fs
+            .listdir(self.id)
+            .map(|entries| {
+                for (i, entry) in entries.iter().skip(start_idx).enumerate() {
+                    if i >= dirents.len() {
+                        return i;
+                    }
+                    dirents[i] = VfsDirEntry::new(&entry.name(), map_type(entry.file_type()));
                 }
-                _ => return Ok(i),
-            }
-        }
-
-        drop(ext4_file);
-        Ok(dirents.len())
+                entries.len() - start_idx
+            })
+            .map_err(map_error)
     }
 
-    /// Renames or moves existing file or directory.
-    fn rename(&self, _src_path: &str, _dst_path: &str) -> VfsResult {
-        todo!()
+    fn rename(&self, src_path: &str, dst_path: &str) -> VfsResult {
+        self.fs
+            .generic_rename(self.id, src_path, dst_path)
+            .map_err(map_error)
     }
 
     fn as_any(&self) -> &dyn core::any::Any {
@@ -302,107 +204,88 @@ impl VfsNodeOps for Ext4FileWrapper {
     }
 }
 
-fn map_dir_imode(imode: u16) -> (VfsNodeType, VfsNodePerm) {
-    let diren_type = imode;
-    let type_code = ext4_rs::DirEntryType::from_bits(diren_type as u8).unwrap();
-    let ty = match type_code {
-        DirEntryType::EXT4_DE_REG_FILE => VfsNodeType::File,
-        DirEntryType::EXT4_DE_DIR => VfsNodeType::Dir,
-        DirEntryType::EXT4_DE_CHRDEV => VfsNodeType::CharDevice,
-        DirEntryType::EXT4_DE_BLKDEV => VfsNodeType::BlockDevice,
-        DirEntryType::EXT4_DE_FIFO => VfsNodeType::Fifo,
-        DirEntryType::EXT4_DE_SOCK => VfsNodeType::Socket,
-        DirEntryType::EXT4_DE_SYMLINK => VfsNodeType::SymLink,
-        _ => {
-            // log::info!("{:x?}", imode);
-            VfsNodeType::File
-        }
-    };
-
-    let perm = ext4_rs::FileMode::from_bits_truncate(imode);
-    let mut vfs_perm = VfsNodePerm::from_bits_truncate(0);
-
-    if perm.contains(ext4_rs::FileMode::S_IXOTH) {
-        vfs_perm |= VfsNodePerm::OTHER_EXEC;
+fn map_error(ext4_err: Ext4Error) -> VfsError {
+    log::warn!("Ext4 error: {:?}", ext4_err);
+    match ext4_err.code() {
+        Ext4ErrorCode::EPERM => VfsError::PermissionDenied,
+        Ext4ErrorCode::ENOENT => VfsError::NotFound,
+        Ext4ErrorCode::EIO => VfsError::Io,
+        Ext4ErrorCode::ENXIO => VfsError::Io, // ?
+        Ext4ErrorCode::E2BIG => VfsError::InvalidInput,
+        Ext4ErrorCode::ENOMEM => VfsError::NoMemory,
+        Ext4ErrorCode::EACCES => VfsError::PermissionDenied, // ?
+        Ext4ErrorCode::EFAULT => VfsError::BadAddress,
+        Ext4ErrorCode::EEXIST => VfsError::AlreadyExists,
+        Ext4ErrorCode::ENODEV => VfsError::Io, // ?
+        Ext4ErrorCode::ENOTDIR => VfsError::NotADirectory,
+        Ext4ErrorCode::EISDIR => VfsError::IsADirectory,
+        Ext4ErrorCode::EINVAL => VfsError::InvalidData,
+        Ext4ErrorCode::EFBIG => VfsError::InvalidData,
+        Ext4ErrorCode::ENOSPC => VfsError::StorageFull,
+        Ext4ErrorCode::EROFS => VfsError::PermissionDenied,
+        Ext4ErrorCode::EMLINK => VfsError::Io, // ?
+        Ext4ErrorCode::ERANGE => VfsError::InvalidData,
+        Ext4ErrorCode::ENOTEMPTY => VfsError::DirectoryNotEmpty,
+        Ext4ErrorCode::ENODATA => VfsError::NotFound, // `NotFound` only for entry?
+        Ext4ErrorCode::ENOTSUP => VfsError::Io,       // ?
+        Ext4ErrorCode::ELINKFAIL => VfsError::Io,     // ?
+        Ext4ErrorCode::EALLOCFAIL => VfsError::StorageFull, // ?
     }
-    if perm.contains(ext4_rs::FileMode::S_IWOTH) {
-        vfs_perm |= VfsNodePerm::OTHER_WRITE;
-    }
-    if perm.contains(ext4_rs::FileMode::S_IROTH) {
-        vfs_perm |= VfsNodePerm::OTHER_READ;
-    }
-
-    if perm.contains(ext4_rs::FileMode::S_IXGRP) {
-        vfs_perm |= VfsNodePerm::GROUP_EXEC;
-    }
-    if perm.contains(ext4_rs::FileMode::S_IWGRP) {
-        vfs_perm |= VfsNodePerm::GROUP_WRITE;
-    }
-    if perm.contains(ext4_rs::FileMode::S_IRGRP) {
-        vfs_perm |= VfsNodePerm::GROUP_READ;
-    }
-
-    if perm.contains(ext4_rs::FileMode::S_IXUSR) {
-        vfs_perm |= VfsNodePerm::OWNER_EXEC;
-    }
-    if perm.contains(ext4_rs::FileMode::S_IWUSR) {
-        vfs_perm |= VfsNodePerm::OWNER_WRITE;
-    }
-    if perm.contains(ext4_rs::FileMode::S_IRUSR) {
-        vfs_perm |= VfsNodePerm::OWNER_READ;
-    }
-
-    (ty, vfs_perm)
 }
 
-fn map_imode(imode: u16) -> (VfsNodeType, VfsNodePerm) {
-    let file_type = (imode & 0xf000) as usize;
-    let ty = match file_type {
-        EXT4_INODE_MODE_FIFO => VfsNodeType::Fifo,
-        EXT4_INODE_MODE_CHARDEV => VfsNodeType::CharDevice,
-        EXT4_INODE_MODE_DIRECTORY => VfsNodeType::Dir,
-        EXT4_INODE_MODE_BLOCKDEV => VfsNodeType::BlockDevice,
-        EXT4_INODE_MODE_FILE => VfsNodeType::File,
-        EXT4_INODE_MODE_SOFTLINK => VfsNodeType::SymLink,
-        EXT4_INODE_MODE_SOCKET => VfsNodeType::Socket,
-        _ => {
-            // log::info!("{:x?}", imode);
-            VfsNodeType::File
-        }
-    };
+fn map_type(ext4_type: EXt4FileType) -> VfsNodeType {
+    match ext4_type {
+        EXt4FileType::RegularFile => VfsNodeType::File,
+        EXt4FileType::Directory => VfsNodeType::Dir,
+        EXt4FileType::CharacterDev => VfsNodeType::CharDevice,
+        EXt4FileType::BlockDev => VfsNodeType::BlockDevice,
+        EXt4FileType::Fifo => VfsNodeType::Fifo,
+        EXt4FileType::Socket => VfsNodeType::Socket,
+        EXt4FileType::SymLink => VfsNodeType::SymLink,
+        EXt4FileType::Unknown => VfsNodeType::File,
+    }
+}
 
-    let perm = ext4_rs::FileMode::from_bits_truncate(imode);
+fn map_type_inv(vfs_type: VfsNodeType) -> EXt4FileType {
+    match vfs_type {
+        VfsNodeType::File => EXt4FileType::RegularFile,
+        VfsNodeType::Dir => EXt4FileType::Directory,
+        VfsNodeType::CharDevice => EXt4FileType::CharacterDev,
+        VfsNodeType::BlockDevice => EXt4FileType::BlockDev,
+        VfsNodeType::Fifo => EXt4FileType::Fifo,
+        VfsNodeType::Socket => EXt4FileType::Socket,
+        VfsNodeType::SymLink => EXt4FileType::SymLink,
+    }
+}
+
+fn map_perm(perm: Ext4InodeMode) -> VfsNodePerm {
     let mut vfs_perm = VfsNodePerm::from_bits_truncate(0);
-
-    if perm.contains(ext4_rs::FileMode::S_IXOTH) {
-        vfs_perm |= VfsNodePerm::OTHER_EXEC;
-    }
-    if perm.contains(ext4_rs::FileMode::S_IWOTH) {
-        vfs_perm |= VfsNodePerm::OTHER_WRITE;
-    }
-    if perm.contains(ext4_rs::FileMode::S_IROTH) {
-        vfs_perm |= VfsNodePerm::OTHER_READ;
-    }
-
-    if perm.contains(ext4_rs::FileMode::S_IXGRP) {
-        vfs_perm |= VfsNodePerm::GROUP_EXEC;
-    }
-    if perm.contains(ext4_rs::FileMode::S_IWGRP) {
-        vfs_perm |= VfsNodePerm::GROUP_WRITE;
-    }
-    if perm.contains(ext4_rs::FileMode::S_IRGRP) {
-        vfs_perm |= VfsNodePerm::GROUP_READ;
-    }
-
-    if perm.contains(ext4_rs::FileMode::S_IXUSR) {
-        vfs_perm |= VfsNodePerm::OWNER_EXEC;
-    }
-    if perm.contains(ext4_rs::FileMode::S_IWUSR) {
-        vfs_perm |= VfsNodePerm::OWNER_WRITE;
-    }
-    if perm.contains(ext4_rs::FileMode::S_IRUSR) {
+    if perm.contains(Ext4InodeMode::USER_READ) {
         vfs_perm |= VfsNodePerm::OWNER_READ;
     }
-
-    (ty, vfs_perm)
+    if perm.contains(Ext4InodeMode::USER_WRITE) {
+        vfs_perm |= VfsNodePerm::OWNER_WRITE;
+    }
+    if perm.contains(Ext4InodeMode::USER_EXEC) {
+        vfs_perm |= VfsNodePerm::OWNER_EXEC;
+    }
+    if perm.contains(Ext4InodeMode::GROUP_READ) {
+        vfs_perm |= VfsNodePerm::GROUP_READ;
+    }
+    if perm.contains(Ext4InodeMode::GROUP_WRITE) {
+        vfs_perm |= VfsNodePerm::GROUP_WRITE;
+    }
+    if perm.contains(Ext4InodeMode::GROUP_EXEC) {
+        vfs_perm |= VfsNodePerm::GROUP_EXEC;
+    }
+    if perm.contains(Ext4InodeMode::OTHER_READ) {
+        vfs_perm |= VfsNodePerm::OTHER_READ;
+    }
+    if perm.contains(Ext4InodeMode::OTHER_WRITE) {
+        vfs_perm |= VfsNodePerm::OTHER_WRITE;
+    }
+    if perm.contains(Ext4InodeMode::OTHER_EXEC) {
+        vfs_perm |= VfsNodePerm::OTHER_EXEC;
+    }
+    vfs_perm
 }
