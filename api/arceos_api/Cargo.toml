@@ -22,7 +22,7 @@ net = ["dep:axnet", "dep:axdriver", "axfeat/net"]
 display = ["dep:axdisplay", "dep:axdriver", "axfeat/display"]
 
 myfs = ["axfeat/myfs"]
-ext4_rs = ["axfeat/ext4_rs"]
+ext4fs = ["axfeat/ext4fs"]
 fatfs = ["axfeat/fatfs"]
 
 # Use dummy functions if the feature is not enabled

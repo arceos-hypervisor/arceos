@@ -10,7 +10,6 @@ repository = "https://github.com/arceos-org/arceos/tree/main/modules/axfs"
 documentation = "https://arceos-org.github.io/arceos/axfs/index.html"
 
 [features]
-fs = []
 devfs = ["dep:axfs_devfs"]
 ramfs = ["dep:axfs_ramfs"]
 procfs = ["dep:axfs_ramfs"]
@@ -18,10 +17,10 @@ sysfs = ["dep:axfs_ramfs"]
 myfs = ["dep:crate_interface"]
 use-ramdisk = []
 
-ext4_rs = ["dep:ext4_rs", "fs"]
-fatfs = ["dep:fatfs", "fs"]
+ext4fs = ["dep:ext4_rs"]
+fatfs = ["dep:fatfs"]
 
-default = ["fs", "fatfs","devfs", "ramfs", "procfs", "sysfs"]
+default = ["devfs", "ramfs", "fatfs", "procfs", "sysfs"]
 
 [dependencies]
 log = "=0.4.21"

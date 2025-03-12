@@ -48,7 +48,7 @@ sched_cfs = ["axfeat/sched_cfs"]
 # File system
 fs = ["arceos_api/fs", "axfeat/fs"]
 myfs = ["arceos_api/myfs", "axfeat/myfs"]
-ext4_rs = ["arceos_api/ext4_rs", "axfeat/ext4_rs"]
+ext4fs = ["arceos_api/ext4fs", "axfeat/ext4fs"]
 fatfs = ["arceos_api/fatfs", "axfeat/fatfs"]
 
 # Networking

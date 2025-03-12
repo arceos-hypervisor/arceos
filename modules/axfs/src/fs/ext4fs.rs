@@ -25,52 +25,51 @@ impl BlockDevice for DiskAdapter {
     fn read_offset(&self, offset: usize) -> Vec<u8> {
         let mut disk = self.inner.borrow_mut();
         let mut buf = vec![0u8; BLOCK_SIZE];
-
-        let start_block_id = offset / DISK_BLOCK_SIZE;
-        let mut offset_in_block = offset % DISK_BLOCK_SIZE;
-        let mut total_bytes_read = 0;
-
-        while total_bytes_read < buf.len() {
-            let current_block_id = start_block_id + (total_bytes_read / DISK_BLOCK_SIZE);
-            let bytes_to_copy =
-                (buf.len() - total_bytes_read).min(DISK_BLOCK_SIZE - offset_in_block);
-
-            let block_data = disk.read_offset(current_block_id * DISK_BLOCK_SIZE + offset_in_block);
-
-            buf[total_bytes_read..total_bytes_read + bytes_to_copy]
-                .copy_from_slice(&block_data[offset_in_block..offset_in_block + bytes_to_copy]);
-
-            total_bytes_read += bytes_to_copy;
-            offset_in_block = 0; // After the first block, subsequent blocks read from the beginning
+        
+        // Set the disk cursor to the requested offset
+        disk.set_position(offset as u64);
+        
+        // Read data into the buffer
+        let mut bytes_read = 0;
+        while bytes_read < BLOCK_SIZE {
+            let read_result = disk.read_one(&mut buf[bytes_read..]);
+            match read_result {
+                Ok(n) => {
+                    bytes_read += n;
+                    if n == 0 { break; } // Exit the loop if no data was read
+                },
+                Err(_) => panic!("Error reading from disk"),
+            }
         }
-
+        
         buf
     }
 
     fn write_offset(&self, offset: usize, buf: &[u8]) {
         let mut disk = self.inner.borrow_mut();
-
-        let start_block_id = offset / DISK_BLOCK_SIZE;
-        let mut offset_in_block = offset % DISK_BLOCK_SIZE;
-
-        let bytes_to_write = buf.len();
-        let mut total_bytes_written = 0;
-
-        while total_bytes_written < bytes_to_write {
-            let current_block_id = start_block_id + (total_bytes_written / DISK_BLOCK_SIZE);
-            let bytes_to_copy =
-                (bytes_to_write - total_bytes_written).min(DISK_BLOCK_SIZE - offset_in_block);
-
-            let mut block_data = disk.read_offset(current_block_id * DISK_BLOCK_SIZE);
-
-            block_data[offset_in_block..offset_in_block + bytes_to_copy]
-                .copy_from_slice(&buf[total_bytes_written..total_bytes_written + bytes_to_copy]);
-
-            disk.write_offset(current_block_id * DISK_BLOCK_SIZE, &block_data)
-                .unwrap();
-
-            total_bytes_written += bytes_to_copy;
-            offset_in_block = 0; // After the first block, subsequent blocks start at the beginning
+        
+        if buf.len() != BLOCK_SIZE {
+            panic!("Buffer length must be equal to BLOCK_SIZE");
+        }
+        
+        // Set the disk cursor to the requested offset
+        disk.set_position(offset as u64);
+        
+        // Write data to the disk
+        let mut bytes_written = 0;
+        while bytes_written < buf.len() {
+            let write_result = disk.write_one(&buf[bytes_written..]);
+            match write_result {
+                Ok(n) => {
+                    bytes_written += n;
+                    if n == 0 { break; } // Exit the loop if no data was written
+                },
+                Err(_) => panic!("Error writing to disk"),
+            }
+        }
+        
+        if bytes_written != buf.len() {
+            panic!("Failed to write all data");
         }
     }
 }
