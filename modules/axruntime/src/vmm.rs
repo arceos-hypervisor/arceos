@@ -5,7 +5,7 @@
 use core::sync::atomic::Ordering;
 
 fn is_init_ok() -> bool {
-    super::INITED_CPUS.load(Ordering::Acquire) == (axconfig::SMP + 1)
+    super::INITED_CPUS.load(Ordering::Acquire) == axconfig::SMP
 }
 
 unsafe extern "C" {
@@ -61,13 +61,12 @@ pub extern "C" fn rust_arceos_main(cpu_id: usize) {
 /// The main entry point of the ArceOS-VMM **when booting from Linux and set self as VMM**!
 ///
 /// It is called from the `vmm_cpu_entry` code in [axhal]. `cpu_id` is the ID of
-/// the current CPU, and `dtb` is the address of the device tree blob. It
-/// finally calls the application's `main` function after all initialization
-/// work is done.
+/// the current CPU. It finally calls the application's `main` function after all
+/// initialization work is done.
 ///
 /// In multi-core environment, this function is called on the primary CPU.
 #[cfg_attr(not(test), unsafe(no_mangle))]
-pub extern "C" fn rust_vmm_main(cpu_id: usize) {
+pub extern "C" fn rust_vmm_main(cpu_id: usize) -> isize {
     ax_println!("{}", super::LOGO);
     ax_println!(
         "\
@@ -105,13 +104,13 @@ pub extern "C" fn rust_vmm_main(cpu_id: usize) {
     super::init_allocator();
 
     #[cfg(feature = "paging")]
-    {
-        info!("Initialize kernel page table...");
-        vmm_remap_kernel_memory().expect("remap kernel memory failed");
-    }
+    axmm::init_memory_management();
 
-    info!("Initialize VMM platform...");
-    axhal::vmm_platform_init();
+    info!("Initialize platform devices...");
+    axhal::platform_init();
+
+    #[cfg(feature = "multitask")]
+    axtask::init_scheduler();
 
     // info!("VMM Primary CPU {} init OK.", cpu_id);
 
@@ -120,40 +119,50 @@ pub extern "C" fn rust_vmm_main(cpu_id: usize) {
     while !is_init_ok() {
         core::hint::spin_loop();
     }
+
+    unsafe { main() };
+
+    info!("VMM main task exited: exit_code={}", -1);
+    -1
 }
+
+use lazyinit::LazyInit;
+
+use axhal::host_memory_regions;
+use axhal::mem::{memory_regions, phys_to_virt};
+use axhal::paging::PageTable;
+
+static KERNEL_PAGE_TABLE: LazyInit<PageTable> = LazyInit::new();
 
 #[cfg(feature = "paging")]
 fn vmm_remap_kernel_memory() -> Result<(), axhal::paging::PagingError> {
-    use axhal::host_memory_regions;
-    use axhal::mem::{memory_regions, phys_to_virt};
-    use axhal::paging::PageTable;
-    use lazyinit::LazyInit;
-
-    static KERNEL_PAGE_TABLE: LazyInit<PageTable> = LazyInit::new();
-
     if axhal::cpu::this_cpu_is_bsp() {
         info!("BSP CPU init KERNEL_PAGE_TABLE...");
         let mut kernel_page_table = PageTable::try_new()?;
         for r in memory_regions() {
-            kernel_page_table.map_region(
-                phys_to_virt(r.paddr),
-                |_| r.paddr,
-                r.size,
-                r.flags.into(),
-                false,
-                false,
-            )?;
+            kernel_page_table
+                .map_region(
+                    phys_to_virt(r.paddr),
+                    |_| r.paddr,
+                    r.size,
+                    r.flags.into(),
+                    false,
+                    false,
+                )?
+                .flush_all();
         }
 
         for r in host_memory_regions() {
-            kernel_page_table.map_region(
-                phys_to_virt(r.paddr),
-                |_| r.paddr,
-                r.size,
-                r.flags.into(),
-                false,
-                false,
-            )?;
+            kernel_page_table
+                .map_region(
+                    phys_to_virt(r.paddr),
+                    |_| r.paddr,
+                    r.size,
+                    r.flags.into(),
+                    false,
+                    false,
+                )?
+                .flush_all();
         }
 
         KERNEL_PAGE_TABLE.init_once(kernel_page_table);
@@ -163,4 +172,9 @@ fn vmm_remap_kernel_memory() -> Result<(), axhal::paging::PagingError> {
 
     unsafe { axhal::arch::write_page_table_root(KERNEL_PAGE_TABLE.root_paddr()) };
     Ok(())
+}
+
+/// Initializes kernel paging for secondary CPUs.
+pub fn init_memory_management_secondary() {
+    unsafe { axhal::arch::write_page_table_root(KERNEL_PAGE_TABLE.root_paddr()) };
 }

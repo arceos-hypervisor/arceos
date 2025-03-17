@@ -1,13 +1,18 @@
 use core::fmt::{Debug, Formatter, Result};
 
-use super::consts::{HV_HEADER_PTR, PER_CPU_SIZE};
+use super::consts::HV_HEADER_PTR;
 
-const HEADER_SIGNATURE: [u8; 8] = *b"ARCEOSIM";
+const HEADER_SIGNATURE: [u8; 8] = *b"EVMIMAGE";
 
+/// Hypervisor description.
+/// Located at the beginning of the hypervisor binary image and loaded by
+/// the driver (which also initializes some fields). 
+/// See jailhouse dir `driver/jailhouse.h` for details.
 #[repr(C)]
 pub struct HvHeader {
     pub signature: [u8; 8],
     pub core_size: usize,
+    /// Not used, always 0.
     pub percpu_size: usize,
     pub entry: usize,
     /// Available CPU numbers provided by current physical platform.
@@ -56,7 +61,7 @@ unsafe extern "C" {
 static HEADER_STUFF: HvHeaderStuff = HvHeaderStuff {
     signature: HEADER_SIGNATURE,
     core_size: __kernel_size,
-    percpu_size: PER_CPU_SIZE,
+    percpu_size: 0,
     entry: __entry_offset,
     max_cpus: 0,
     rt_cpus: 0,

@@ -214,6 +214,24 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d468802bab17cbc0cc575e9b053f41e72aa36bfa6b7f55e3529ffa43161b97fa"
 
 [[package]]
+name = "axaddrspace"
+version = "0.1.0"
+source = "git+https://github.com/arceos-hypervisor/axaddrspace.git#f1ab1108c1477f6f4f56035b74ea76c8932d6b8d"
+dependencies = [
+ "axerrno",
+ "bit_field",
+ "bitflags 2.6.0",
+ "cfg-if",
+ "lazyinit",
+ "log",
+ "memory_addr",
+ "memory_set",
+ "numeric-enum-macro",
+ "page_table_entry",
+ "page_table_multiarch",
+]
+
+[[package]]
 name = "axalloc"
 version = "0.1.0"
 dependencies = [
@@ -470,6 +488,7 @@ dependencies = [
  "x86",
  "x86_64 0.15.2",
  "x86_rtc",
+ "x86_vcpu",
 ]
 
 [[package]]
@@ -596,6 +615,17 @@ dependencies = [
  "rand",
  "scheduler",
  "timer_list",
+]
+
+[[package]]
+name = "axvcpu"
+version = "0.1.0"
+source = "git+https://github.com/arceos-hypervisor/axvcpu.git#8414a575723f929d5fd24010ce16446d90ecf268"
+dependencies = [
+ "axaddrspace",
+ "axerrno",
+ "memory_addr",
+ "percpu",
 ]
 
 [[package]]
@@ -1178,6 +1208,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6f769efcf10b9dfb4c913bebb409cda77b1a3f072b249bf5465e250bcb30eb49"
 
 [[package]]
+name = "memory_set"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a4552d02c866c57e8b06b919ea8c2f8f398cad245b8f6aac726657bc972d663d"
+dependencies = [
+ "memory_addr",
+]
+
+[[package]]
 name = "minimal-lexical"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1201,6 +1240,12 @@ checksum = "f30b0abd723be7e2ffca1272140fac1a2f084c77ec3e123c192b66af1ee9e6c2"
 dependencies = [
  "autocfg",
 ]
+
+[[package]]
+name = "numeric-enum-macro"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "300e4bdb6b46b592948e700ea1ef24a4296491f6a0ee722b258040abd15a3714"
 
 [[package]]
 name = "once_cell"
@@ -1913,6 +1958,27 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d1a42420da20c01d82e5d42231570efa3b9e16a5515eaaf9ee4e964f49cc1313"
 dependencies = [
  "cfg-if",
+ "x86_64 0.15.2",
+]
+
+[[package]]
+name = "x86_vcpu"
+version = "0.1.0"
+source = "git+https://github.com/arceos-hypervisor/x86_vcpu.git#5f6eaf4157ee8385ba1a2bfe5060098be18b0245"
+dependencies = [
+ "axaddrspace",
+ "axerrno",
+ "axvcpu",
+ "bit_field",
+ "bitflags 2.6.0",
+ "cfg-if",
+ "crate_interface",
+ "log",
+ "memory_addr",
+ "numeric-enum-macro",
+ "page_table_entry",
+ "raw-cpuid 11.1.0",
+ "x86",
  "x86_64 0.15.2",
 ]
 

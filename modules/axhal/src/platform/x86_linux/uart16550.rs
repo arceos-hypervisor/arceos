@@ -6,7 +6,9 @@ use x86_64::instructions::port::{Port, PortReadOnly, PortWriteOnly};
 const UART_CLOCK_FACTOR: usize = 16;
 const OSC_FREQ: usize = 1_843_200;
 
-static COM1: SpinNoIrq<Uart16550> = SpinNoIrq::new(Uart16550::new(0x3f8));
+const PORT_COM1: u16 = 0x2f8;
+
+static COM1: SpinNoIrq<Uart16550> = SpinNoIrq::new(Uart16550::new(PORT_COM1));
 
 bitflags::bitflags! {
     /// Line status flags

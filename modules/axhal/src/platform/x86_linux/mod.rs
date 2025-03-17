@@ -12,10 +12,11 @@ pub mod misc;
 pub mod time;
 
 // mods for vmm usage.
-mod percpu;
+// mod percpu;
 
 mod config;
 mod consts;
+mod context;
 mod header;
 
 // #[cfg(feature = "smp")]
@@ -37,7 +38,8 @@ use axlog::ax_println as println;
 use config::HvSystemConfig;
 // use error::HvResult;
 use header::HvHeader;
-use percpu::PerCpu;
+
+use crate::cpu;
 
 static VMM_PRIMARY_INIT_OK: AtomicU32 = AtomicU32::new(0);
 static ERROR_NUM: AtomicI32 = AtomicI32::new(0);
@@ -56,8 +58,16 @@ fn wait_for(condition: impl Fn() -> bool) {
 }
 
 unsafe extern "C" {
-    unsafe fn rust_vmm_main(cpu_id: usize);
+    unsafe fn rust_vmm_main(cpu_id: usize) -> isize;
+    #[cfg(feature = "smp")]
+    // unsafe fn rust_main_secondary(cpu_id: usize) -> !;
     unsafe fn rust_arceos_main(cpu_id: usize) -> !;
+}
+
+unsafe extern "C" {
+    fn rust_main(cpu_id: usize, dtb: usize) -> !;
+    #[cfg(feature = "smp")]
+    fn rust_main_secondary(cpu_id: usize) -> !;
 }
 
 fn current_cpu_id() -> usize {
@@ -67,17 +77,36 @@ fn current_cpu_id() -> usize {
     }
 }
 
-fn vmm_primary_init_early(cpu_id: usize) {
+fn vmm_primary_init_early() {
+    let cpu_id = current_cpu_id();
+
     // We do not clear bss here.
     // Because currently the image was loaded by Linux.
-    // crate::mem::clear_bss();
-
+    crate::mem::clear_bss();
     crate::cpu::init_primary(cpu_id);
+    self::uart16550::init();
+    VMM_PRIMARY_INIT_OK.store(1, Ordering::Release);
+}
+
+fn vmm_secondary_init_early() {
+    #[cfg(feature = "smp")]
+    {
+        let cpu_id = current_cpu_id();
+        println!("Secondary CPU {} entered.", cpu_id);
+        crate::cpu::init_secondary(cpu_id);
+    }
+}
+
+fn vmm_primary_init() {
+    let cpu_id = current_cpu_id();
+    self::dtables::init_primary();
     self::time::init_early();
 
-    // println!("HvHeader\n{:#?}", HvHeader::get());
+    println!("HvHeader\n{:#?}", HvHeader::get());
 
     let system_config = HvSystemConfig::get();
+
+    system_config.check();
 
     println!(
         "\n\
@@ -89,46 +118,65 @@ fn vmm_primary_init_early(cpu_id: usize) {
         core::str::from_utf8(&system_config.signature),
         system_config.revision,
     );
+}
 
-    VMM_PRIMARY_INIT_OK.store(1, Ordering::Release);
-
-    unsafe {
-        rust_vmm_main(cpu_id);
+fn vmm_secondary_init() {
+    #[cfg(feature = "smp")]
+    {
+        self::dtables::init_secondary();
     }
 }
 
-extern "sysv64" fn vmm_cpu_entry(cpu_data: &mut PerCpu, _linux_sp: usize) -> i32 {
-    // Currently we set core 0 as Linux.
-    let is_primary = cpu_data.id == 0;
+extern "sysv64" fn vmm_cpu_entry(core_id: usize, linux_sp: usize) -> i32 {
+    let cpu_id = current_cpu_id();
+
+    // Use Cpu ID 0 as primary core.
+    // TODO: on some platform Local Apic ID may not start from Zero.
+    let is_primary = core_id == 0;
+
+    println!(
+        "{} Core {} CPU {} entered.",
+        if is_primary { "Primary" } else { "Secondary" },
+        core_id,
+        cpu_id,
+    );
 
     let vm_cpus = HvHeader::get().reserved_cpus();
 
-    wait_for(|| PerCpu::entered_cpus() < vm_cpus);
-
-    // println!(
-    //     "{} CPU {} entered.",
-    //     if is_primary { "Primary" } else { "Secondary" },
-    //     cpu_data.id
-    // );
+    wait_for(|| entry::entered_cpus() < vm_cpus);
 
     // First, we init primary core for VMM.
     if is_primary {
-        vmm_primary_init_early(cpu_data.id as usize);
+        vmm_primary_init_early();
     } else {
-        // wait_for_counter(&VMM_PRIMARY_INIT_OK, 1);
+        vmm_secondary_init_early();
+    }
 
-        // wait_for_counter(&VMM_MAIN_INIT_OK, 1);
+    // Note: this has to be done after `cpu::init_primary`.
+    // Because LinuxContext will be stored in percpu area.
+    context::set_linux_context(linux_sp);
 
-        // vmm_secondary_init_early(cpu_data.id as usize);
+    if is_primary {
+        vmm_primary_init();
+    } else {
+        vmm_secondary_init();
+    }
+
+    unsafe {
+        if is_primary {
+            rust_main(cpu_id, 0);
+        } else {
+            rust_main_secondary(cpu_id);
+        }
     }
 
     let code = 0;
-    // println!(
-    //     "{} CPU {} return back to driver with code {}.",
-    //     if is_primary { "Primary" } else { "Secondary" },
-    //     cpu_data.id,
-    //     code
-    // );
+    println!(
+        "{} CPU {} return back to driver with code {}.",
+        if is_primary { "Primary" } else { "Secondary" },
+        cpu_id,
+        code
+    );
     code
 }
 
@@ -163,18 +211,20 @@ unsafe extern "C" fn rust_entry_from_vmm(magic: usize) {
 /// Boot arceos cpus through sendsipi.
 pub fn vmm_platform_init() {
     self::lapic::init();
-    self::mp::start_arceos_cpus();
+    // self::mp::start_arceos_cpus();
 }
 
 /// Initializes the platform devices for the primary CPU.
 pub fn platform_init() {
-    self::apic::init_primary();
-    self::time::init_primary();
+    self::lapic::init();
+
+    // self::apic::init_primary();
+    // self::time::init_primary();
 }
 
 /// Initializes the platform devices for secondary CPUs.
 #[cfg(feature = "smp")]
 pub fn platform_init_secondary() {
-    self::apic::init_secondary();
-    self::time::init_secondary();
+    // self::apic::init_secondary();
+    // self::time::init_secondary();
 }

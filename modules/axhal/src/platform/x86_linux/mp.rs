@@ -3,7 +3,7 @@ use crate::time::{busy_wait, Duration};
 use core::sync::atomic::Ordering;
 
 use super::header::HvHeader;
-use super::percpu::PerCpu;
+// use super::percpu::PerCpu;
 use axconfig::{SMP, TASK_STACK_SIZE};
 
 const START_PAGE_IDX: u8 = 6;
@@ -67,9 +67,9 @@ pub fn start_arceos_cpus() {
         let mut arceos_cpu_num = 0;
 
         for apic_id in 0..max_cpus {
-            if PerCpu::cpu_is_booted(apic_id as usize) {
-                continue;
-            }
+            // if PerCpu::cpu_is_booted(apic_id as usize) {
+            //     continue;
+            // }
             let stack_top = virt_to_phys(VirtAddr::from(
                 SECONDARY_BOOT_STACK[arceos_cpu_num].as_ptr_range().end as usize,
             ))

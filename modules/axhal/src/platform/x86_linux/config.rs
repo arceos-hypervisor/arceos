@@ -1,8 +1,12 @@
 use core::fmt::{Debug, Formatter, Result};
 use core::{mem::size_of, slice};
 
-const CONFIG_SIGNATURE: [u8; 6] = *b"ARCEOS";
-const CONFIG_REVISION: u16 = 13;
+use bitflags::bitflags;
+
+use crate::mem::{MemRegion, MemRegionFlags};
+
+const CONFIG_SIGNATURE: [u8; 6] = *b"EVMSYS";
+const CONFIG_REVISION: u16 = 314;
 
 const HV_CELL_NAME_MAXLEN: usize = 31;
 
@@ -21,15 +25,52 @@ pub struct HvCellDesc {
 }
 
 #[derive(Debug)]
-#[repr(C, packed)]
+#[repr(C)]
 pub struct HvMemoryRegion {
     pub phys_start: u64,
     pub virt_start: u64,
     pub size: u64,
-    pub flags: u64,
+    pub flags: MemFlags,
+}
+
+bitflags! {
+    #[derive(Debug, Clone)]
+    pub struct MemFlags: u64 {
+        const READ          = 1 << 0;
+        const WRITE         = 1 << 1;
+        const EXECUTE       = 1 << 2;
+        const DMA           = 1 << 3;
+        const IO            = 1 << 4;
+        const NO_HUGEPAGES  = 1 << 8;
+        const USER          = 1 << 9;
+    }
+}
+
+impl Into<MemRegionFlags> for MemFlags {
+    fn into(self) -> MemRegionFlags {
+        let mut flags = MemRegionFlags::empty();
+        if self.contains(MemFlags::READ) {
+            flags |= MemRegionFlags::READ;
+        }
+        if self.contains(MemFlags::WRITE) {
+            flags |= MemRegionFlags::WRITE;
+        }
+        if self.contains(MemFlags::EXECUTE) {
+            flags |= MemRegionFlags::EXECUTE;
+        }
+        if self.contains(MemFlags::DMA) {
+            flags |= MemRegionFlags::DEVICE;
+        }
+        if self.contains(MemFlags::IO) {
+            flags |= MemRegionFlags::DEVICE;
+        }
+        flags
+    }
 }
 
 /// General descriptor of the system.
+///
+/// See jailhouse dir `driver/cell-config.h` for details.
 #[derive(Debug)]
 #[repr(C)]
 pub struct HvSystemConfig {
@@ -37,8 +78,6 @@ pub struct HvSystemConfig {
     pub revision: u16,
     /// AxVisor location in memory
     pub hypervisor_memory: HvMemoryRegion,
-    /// RTOS location in memory
-    pub rtos_memory: HvMemoryRegion,
     pub root_cell: HvCellDesc,
     // CellConfigLayout placed here.
 }

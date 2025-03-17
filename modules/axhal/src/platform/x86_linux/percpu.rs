@@ -4,7 +4,6 @@ use core::sync::atomic::{AtomicU32, Ordering};
 // use crate::arch::vmm::{Vcpu, VcpuAccessGuestState};
 // use crate::arch::{cpu, ArchPerCpu, LinuxContext};
 // use crate::cell::Cell;
-use super::consts::{PER_CPU_ARRAY_PTR, PER_CPU_SIZE};
 use super::current_cpu_id;
 // use crate::error::HvResult;
 use super::header::HvHeader;
@@ -56,10 +55,6 @@ impl PerCpu {
         ret
     }
 
-    pub unsafe fn from_id_mut<'a>(cpu_id: u32) -> &'a mut Self {
-        let vaddr = PER_CPU_ARRAY_PTR as usize + cpu_id as usize * PER_CPU_SIZE;
-        &mut *(vaddr as *mut Self)
-    }
 
     pub fn current<'a>() -> &'a Self {
         Self::current_mut()
