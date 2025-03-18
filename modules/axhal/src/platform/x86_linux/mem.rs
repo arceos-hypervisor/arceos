@@ -30,23 +30,15 @@ fn vmm_free_regions() -> impl Iterator<Item = MemRegion> {
 }
 
 pub fn host_memory_regions() -> impl Iterator<Item = MemRegion> {
-    use crate::mem::MemRegionFlags;
-
     let sys_config = HvSystemConfig::get();
     let cell_config = &sys_config.root_cell.config();
-    // Map all guest RAM to directly access in hypervisor.
-    cell_config
-        .mem_regions()
-        .iter()
-        .filter(|region| {
-            Into::<MemRegionFlags>::into(region.flags.clone()).contains(MemRegionFlags::DEVICE)
-        })
-        .map(|region| MemRegion {
-            paddr: PhysAddr::from(region.phys_start as usize),
-            size: region.size as usize,
-            flags: region.flags.clone().into(),
-            name: "Linux mem",
-        })
+
+    cell_config.mem_regions().iter().map(|region| MemRegion {
+        paddr: PhysAddr::from(region.phys_start as usize),
+        size: region.size as usize,
+        flags: region.flags.clone().into(),
+        name: "Linux mem",
+    })
 }
 
 /// Returns platform-specific memory regions.
@@ -64,5 +56,8 @@ pub(crate) fn platform_regions() -> impl Iterator<Item = MemRegion> {
     // Cause we need to reserved regions for
     // per-CPU data and `HvSystemConfig`
     .chain(crate::mem::default_mmio_regions())
-    .chain(host_memory_regions())
+    .chain(host_memory_regions().filter(|region| {
+        // Map all guest RAM to directly access in hypervisor.
+        region.flags.contains(MemRegionFlags::DEVICE)
+    }))
 }

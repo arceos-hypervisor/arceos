@@ -1,9 +1,11 @@
+//! Cell configuration structures inherited from Jailhouse.
+
 use core::fmt::{Debug, Formatter, Result};
 use core::{mem::size_of, slice};
 
 use bitflags::bitflags;
 
-use crate::mem::{MemRegion, MemRegionFlags};
+use crate::mem::MemRegionFlags;
 
 const CONFIG_SIGNATURE: [u8; 6] = *b"EVMSYS";
 const CONFIG_REVISION: u16 = 314;

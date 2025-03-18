@@ -31,6 +31,9 @@ pub mod console {
     pub use super::uart16550::*;
 }
 
+pub use context::get_linux_context_by_cpu_id;
+pub use context::get_linux_context_list;
+
 use core::sync::atomic::{AtomicI32, AtomicU32, Ordering};
 
 use axlog::ax_println as println;
@@ -39,7 +42,6 @@ use config::HvSystemConfig;
 // use error::HvResult;
 use header::HvHeader;
 
-use crate::cpu;
 
 static VMM_PRIMARY_INIT_OK: AtomicU32 = AtomicU32::new(0);
 static ERROR_NUM: AtomicI32 = AtomicI32::new(0);
