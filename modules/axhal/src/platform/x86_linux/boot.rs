@@ -33,20 +33,20 @@ const EFER: u64 = EferFlags::LONG_MODE_ENABLE.bits() | EferFlags::NO_EXECUTE_ENA
 #[unsafe(link_section = ".bss.stack")]
 static mut BOOT_STACK: [u8; TASK_STACK_SIZE] = [0; TASK_STACK_SIZE];
 
-global_asm!(
-    include_str!("multiboot.S"),
-    mb_magic = const MULTIBOOT_BOOTLOADER_MAGIC,
-    mb_hdr_magic = const MULTIBOOT_HEADER_MAGIC,
-    mb_hdr_flags = const MULTIBOOT_HEADER_FLAGS,
-    entry = sym super::rust_entry,
-    entry_secondary = sym super::rust_entry_from_vmm,
+// global_asm!(
+//     include_str!("multiboot.S"),
+//     mb_magic = const MULTIBOOT_BOOTLOADER_MAGIC,
+//     mb_hdr_magic = const MULTIBOOT_HEADER_MAGIC,
+//     mb_hdr_flags = const MULTIBOOT_HEADER_FLAGS,
+//     entry = sym super::rust_entry,
+//     entry_secondary = sym super::rust_entry_from_vmm,
 
-    offset = const PHYS_VIRT_OFFSET,
-    boot_stack_size = const TASK_STACK_SIZE,
-    boot_stack = sym BOOT_STACK,
+//     offset = const PHYS_VIRT_OFFSET,
+//     boot_stack_size = const TASK_STACK_SIZE,
+//     boot_stack = sym BOOT_STACK,
 
-    cr0 = const CR0,
-    cr4 = const CR4,
-    efer_msr = const x86::msr::IA32_EFER,
-    efer = const EFER,
-);
+//     cr0 = const CR0,
+//     cr4 = const CR4,
+//     efer_msr = const x86::msr::IA32_EFER,
+//     efer = const EFER,
+// );

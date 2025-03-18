@@ -48,20 +48,13 @@ fn has_err() -> bool {
     ERROR_NUM.load(Ordering::Acquire) != 0
 }
 
-fn wait_for(condition: impl Fn() -> bool) {
+fn wait_while(condition: impl Fn() -> bool) {
     while !has_err() && condition() {
         core::hint::spin_loop();
     }
     if has_err() {
         println!("[Error] Other cpu init failed!")
     }
-}
-
-unsafe extern "C" {
-    unsafe fn rust_vmm_main(cpu_id: usize) -> isize;
-    #[cfg(feature = "smp")]
-    // unsafe fn rust_main_secondary(cpu_id: usize) -> !;
-    unsafe fn rust_arceos_main(cpu_id: usize) -> !;
 }
 
 unsafe extern "C" {
@@ -80,19 +73,19 @@ fn current_cpu_id() -> usize {
 fn vmm_primary_init_early() {
     let cpu_id = current_cpu_id();
 
+    println!("Primary CPU {} init early", cpu_id);
     // We do not clear bss here.
     // Because currently the image was loaded by Linux.
-    crate::mem::clear_bss();
+    // crate::mem::clear_bss();
     crate::cpu::init_primary(cpu_id);
     self::uart16550::init();
-    VMM_PRIMARY_INIT_OK.store(1, Ordering::Release);
 }
 
 fn vmm_secondary_init_early() {
     #[cfg(feature = "smp")]
     {
         let cpu_id = current_cpu_id();
-        println!("Secondary CPU {} entered.", cpu_id);
+        println!("Secondary CPU {} init early.", cpu_id);
         crate::cpu::init_secondary(cpu_id);
     }
 }
@@ -134,21 +127,31 @@ extern "sysv64" fn vmm_cpu_entry(core_id: usize, linux_sp: usize) -> i32 {
     // TODO: on some platform Local Apic ID may not start from Zero.
     let is_primary = core_id == 0;
 
+    let vm_cpus = HvHeader::get().reserved_cpus();
+
     println!(
-        "{} Core {} CPU {} entered.",
+        "{} Core {} CPU {} entered. {} of {}",
+        if is_primary { "Primary" } else { "Secondary" },
+        core_id,
+        cpu_id,
+        entry::entered_cpus(),
+        vm_cpus
+    );
+
+    wait_while(|| entry::entered_cpus() < vm_cpus);
+
+    println!(
+        "{} Core {} CPU {} start to initialize.",
         if is_primary { "Primary" } else { "Secondary" },
         core_id,
         cpu_id,
     );
 
-    let vm_cpus = HvHeader::get().reserved_cpus();
-
-    wait_for(|| entry::entered_cpus() < vm_cpus);
-
     // First, we init primary core for VMM.
     if is_primary {
         vmm_primary_init_early();
     } else {
+        wait_while(|| VMM_PRIMARY_INIT_OK.load(Ordering::Acquire) == 0);
         vmm_secondary_init_early();
     }
 
@@ -192,32 +195,11 @@ unsafe extern "C" fn rust_entry(_magic: usize, _mbi: usize) {
     // }
 }
 
-#[allow(unused_variables)]
-unsafe extern "C" fn rust_entry_from_vmm(magic: usize) {
-    let cpu_id = current_cpu_id();
-    info!("ARCEOS CPU entered on Core {}.", cpu_id);
-
-    if magic == self::boot::MULTIBOOT_BOOTLOADER_MAGIC {
-        crate::cpu::init_secondary(cpu_id);
-        self::dtables::init_primary();
-        self::time::init_early();
-        rust_arceos_main(cpu_id);
-    } else {
-        panic!("Something is wrong during booting RT cores...");
-    }
-}
-
-/// Initializes the platform devices for the primary CPU.
-/// Boot arceos cpus through sendsipi.
-pub fn vmm_platform_init() {
-    self::lapic::init();
-    // self::mp::start_arceos_cpus();
-}
-
 /// Initializes the platform devices for the primary CPU.
 pub fn platform_init() {
     self::lapic::init();
 
+    VMM_PRIMARY_INIT_OK.store(1, Ordering::Release);
     // self::apic::init_primary();
     // self::time::init_primary();
 }

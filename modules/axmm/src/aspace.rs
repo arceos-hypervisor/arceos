@@ -74,7 +74,10 @@ impl AddrSpace {
         flags: MappingFlags,
     ) -> AxResult {
         if !self.contains_range(start_vaddr, size) {
-            warn!("address out of range: {:?} + {}, paddr {:?} {:?}", start_vaddr, size, start_paddr, flags);
+            warn!(
+                "address out of range: {:?} + {:#x}, paddr {:?} {:?}",
+                start_vaddr, size, start_paddr, flags
+            );
             return ax_err!(InvalidInput, "address out of range");
         }
         if !start_vaddr.is_aligned_4k() || !start_paddr.is_aligned_4k() || !is_aligned_4k(size) {
