@@ -29,6 +29,20 @@ fn vmm_free_regions() -> impl Iterator<Item = MemRegion> {
     })
 }
 
+fn vmm_cfg_regions() -> impl Iterator<Item = MemRegion> {
+    let vmm_cfg_start = super::consts::cfg_region_start();
+    let vmm_cfg_end = super::consts::free_memory_start();
+    let vmm_cfg_size = vmm_cfg_end.as_usize() - vmm_cfg_start.as_usize();
+
+    core::iter::once(MemRegion {
+        paddr: virt_to_phys(vmm_cfg_start),
+        size: vmm_cfg_size,
+        // Provided by host, read-only.
+        flags: MemRegionFlags::RESERVED | MemRegionFlags::READ,
+        name: "System config (for VMM)",
+    })
+}
+
 pub fn host_memory_regions() -> impl Iterator<Item = MemRegion> {
     let sys_config = HvSystemConfig::get();
     let cell_config = &sys_config.root_cell.config();
@@ -49,8 +63,9 @@ pub(crate) fn platform_regions() -> impl Iterator<Item = MemRegion> {
         paddr: virt_to_phys((__header_start as usize).into()),
         size: __header_end as usize - __header_start as usize,
         flags: MemRegionFlags::RESERVED | MemRegionFlags::READ,
-        name: ".header",
+        name: ".header (for VMM)",
     })
+    .chain(vmm_cfg_regions())
     .chain(vmm_free_regions())
     // Here we do not use the `default_free_regions`` from  `crate::mem`.
     // Cause we need to reserved regions for

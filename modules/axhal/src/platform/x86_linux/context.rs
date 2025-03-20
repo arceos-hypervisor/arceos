@@ -14,18 +14,25 @@ static LINUX_CTX: LazyInit<LinuxContext> = LazyInit::new();
 static mut LINUX_CTX_LIST: LazyInit<[MaybeUninit<LinuxContext>; SMP]> = LazyInit::new();
 
 /// Set Linux context for current CPU.
-pub fn set_linux_context(linux_sp: usize) {
-    let linux_ctx = unsafe { LINUX_CTX.current_ref_mut_raw() };
-    linux_ctx.init_once(LinuxContext::load_from(linux_sp));
+pub fn set_linux_context(linux_sp: usize, cpu_id: usize) {
+    // let linux_ctx = unsafe { LINUX_CTX.current_ref_mut_raw() };
+    // linux_ctx.init_once(LinuxContext::load_from(linux_sp));
 
     unsafe {
         if LINUX_CTX_LIST.is_inited() {
-            LINUX_CTX_LIST[this_cpu_id()].write(LinuxContext::load_from(linux_sp));
+            LINUX_CTX_LIST[cpu_id].write(LinuxContext::load_from(linux_sp));
         } else {
             let mut list = [const { MaybeUninit::uninit() }; SMP];
-            list[this_cpu_id()].write(LinuxContext::load_from(linux_sp));
+            list[cpu_id].write(LinuxContext::load_from(linux_sp));
             LINUX_CTX_LIST.init_once(list);
         }
+
+        axlog::ax_println!(
+            "Core {} {} Linux context set {:#x?}",
+            this_cpu_id(),
+            cpu_id,
+            &LINUX_CTX_LIST[cpu_id].assume_init()
+        );
     }
 }
 

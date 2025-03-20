@@ -86,13 +86,15 @@ fn cpu_has_x2apic() -> bool {
     }
 }
 
-pub(super) fn init_primary() {
+pub(super) fn init_primary(enabled: bool) {
     info!("Initialize Local APIC...");
 
-    unsafe {
-        // Disable 8259A interrupt controllers
-        Port::<u8>::new(0x21).write(0xff);
-        Port::<u8>::new(0xA1).write(0xff);
+    if enabled {
+        unsafe {
+            // Disable 8259A interrupt controllers
+            Port::<u8>::new(0x21).write(0xff);
+            Port::<u8>::new(0xA1).write(0xff);
+        }
     }
 
     let mut builder = LocalApicBuilder::new();
@@ -112,7 +114,9 @@ pub(super) fn init_primary() {
 
     let mut lapic = builder.build().unwrap();
     unsafe {
-        lapic.enable();
+        if enabled {
+            lapic.enable();
+        }
         LOCAL_APIC.get().as_mut().unwrap().write(lapic);
     }
 
@@ -122,6 +126,8 @@ pub(super) fn init_primary() {
 }
 
 #[cfg(feature = "smp")]
-pub(super) fn init_secondary() {
-    unsafe { local_apic().enable() };
+pub(super) fn init_secondary(enabled: bool) {
+    if enabled {
+        unsafe { local_apic().enable() };
+    }
 }
