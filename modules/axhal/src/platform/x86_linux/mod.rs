@@ -1,6 +1,4 @@
 mod apic;
-// It's a simplied version of LocalApic, just use for sendsipi.
-mod lapic;
 
 mod boot;
 mod dtables;
@@ -31,7 +29,6 @@ pub mod console {
     pub use super::uart16550::*;
 }
 
-pub use context::get_linux_context_by_cpu_id;
 pub use context::get_linux_context_list;
 
 use core::sync::atomic::{AtomicI32, AtomicU32, Ordering};
@@ -198,7 +195,7 @@ pub fn platform_init() {
 
     // Consruct LAPIC but DO NOT operate the LAPIC.
     // because the LAPIC belongs to Linux, we should not touch it.
-    // self::apic::init_primary(false);
+    self::apic::init_primary(false);
     // self::time::init_primary();
 
     VMM_PRIMARY_INIT_OK.store(1, Ordering::Release);
@@ -208,6 +205,6 @@ pub fn platform_init() {
 /// Initializes the platform devices for secondary CPUs.
 #[cfg(feature = "smp")]
 pub fn platform_init_secondary() {
-    // self::apic::init_secondary(false);
+    self::apic::init_secondary(false);
     // self::time::init_secondary();
 }

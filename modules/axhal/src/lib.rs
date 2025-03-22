@@ -79,5 +79,4 @@ pub use self::platform::platform_init;
 pub use self::platform::platform_init_secondary;
 
 pub use self::platform::mem::host_memory_regions;
-pub use self::platform::get_linux_context_by_cpu_id;
 pub use self::platform::get_linux_context_list;

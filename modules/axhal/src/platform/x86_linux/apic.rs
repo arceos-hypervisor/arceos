@@ -120,9 +120,9 @@ pub(super) fn init_primary(enabled: bool) {
         LOCAL_APIC.get().as_mut().unwrap().write(lapic);
     }
 
-    info!("Initialize IO APIC...");
-    let io_apic = unsafe { IoApic::new(phys_to_virt(IO_APIC_BASE).as_usize() as u64) };
-    IO_APIC.init_once(SpinNoIrq::new(io_apic));
+    // info!("Initialize IO APIC...");
+    // let io_apic = unsafe { IoApic::new(phys_to_virt(IO_APIC_BASE).as_usize() as u64) };
+    // IO_APIC.init_once(SpinNoIrq::new(io_apic));
 }
 
 #[cfg(feature = "smp")]
