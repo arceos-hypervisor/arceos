@@ -32,9 +32,7 @@ unsafe extern "sysv64" fn switch_stack(linux_sp: usize) -> i32 {
             // Note: cpu_id here is not Local APIC ID, it is the index of entered CPUs.
             // We just use it here to choose VMM_BOOT_STACK.
             let core_id = ENTERED_CPUS.fetch_add(1, Ordering::SeqCst);
-            // let _cpu_id = current_cpu_id();
 
-            // let cpu_data = PerCpu::new();
             let hv_sp = VMM_BOOT_STACK[core_id as usize].as_ptr_range().end as usize;
             let ret;
             core::arch::asm!("
@@ -58,12 +56,20 @@ unsafe extern "sysv64" fn switch_stack(linux_sp: usize) -> i32 {
 
         let ret = vmm_entry(linux_sp);
 
+        axlog::ax_println!(
+            "CPU {} return back to driver with code {}.",
+            ret,
+            super::current_cpu_id()
+        );
+
         x86::msr::wrmsr(x86::msr::IA32_GS_BASE, linux_tp);
         x86::controlregs::cr3_write(linux_cr3);
         ret
     }
 }
 
+/// Cores entered from Linux will call this function.
+/// This function will switch to VMM stack and call `super::vmm_cpu_entry`.
 #[naked]
 #[unsafe(link_section = ".text.boot")]
 #[unsafe(no_mangle)]

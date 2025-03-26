@@ -31,6 +31,9 @@ static LOCAL_APIC: SyncUnsafeCell<MaybeUninit<LocalApic>> =
 static mut IS_X2APIC: bool = false;
 static IO_APIC: LazyInit<SpinNoIrq<IoApic>> = LazyInit::new();
 
+const MAX_APIC_ID: u32 = 254;
+static mut APIC_TO_CPU_ID: [u32; MAX_APIC_ID as usize + 1] = [u32::MAX; MAX_APIC_ID as usize + 1];
+
 /// Enables or disables the given IRQ.
 #[cfg(feature = "irq")]
 pub fn set_enable(vector: usize, enabled: bool) {
@@ -117,6 +120,9 @@ pub(super) fn init_primary(enabled: bool) {
         if enabled {
             lapic.enable();
         }
+
+        APIC_TO_CPU_ID[lapic.id() as usize] = 0;
+
         LOCAL_APIC.get().as_mut().unwrap().write(lapic);
     }
 
@@ -127,7 +133,21 @@ pub(super) fn init_primary(enabled: bool) {
 
 #[cfg(feature = "smp")]
 pub(super) fn init_secondary(enabled: bool) {
+    let lapic = local_apic();
+
     if enabled {
-        unsafe { local_apic().enable() };
+        unsafe {
+            lapic.enable();
+        }
     }
+    unsafe {
+        APIC_TO_CPU_ID[lapic.id() as usize] = 0;
+    };
+}
+
+/// Returns if the given APIC ID is reserved.
+/// The APIC ID is reserved if it entered Linux, which has set the corresponding
+/// entry in `APIC_TO_CPU_ID` to 0.
+pub(super) fn apic_id_is_reserved(apic_id: usize) -> bool {
+    unsafe { APIC_TO_CPU_ID[apic_id] == 0 }
 }

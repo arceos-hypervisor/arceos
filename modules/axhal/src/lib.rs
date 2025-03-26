@@ -78,5 +78,7 @@ pub use self::platform::platform_init;
 #[cfg(feature = "smp")]
 pub use self::platform::platform_init_secondary;
 
+pub use self::platform::config as hvconfig;
+pub use self::platform::context::get_linux_context_list;
+pub use self::platform::header as hvheader;
 pub use self::platform::mem::host_memory_regions;
-pub use self::platform::get_linux_context_list;

@@ -6,7 +6,7 @@ const HEADER_SIGNATURE: [u8; 8] = *b"EVMIMAGE";
 
 /// Hypervisor description.
 /// Located at the beginning of the hypervisor binary image and loaded by
-/// the driver (which also initializes some fields). 
+/// the driver (which also initializes some fields).
 /// See jailhouse dir `driver/jailhouse.h` for details.
 #[repr(C)]
 pub struct HvHeader {
@@ -27,6 +27,7 @@ impl HvHeader {
         unsafe { &*HV_HEADER_PTR }
     }
 
+    /// Get the number of CPUs reserved for Linux.
     pub fn reserved_cpus(&self) -> u32 {
         if self.arceos_cpus < self.max_cpus {
             self.max_cpus - self.arceos_cpus

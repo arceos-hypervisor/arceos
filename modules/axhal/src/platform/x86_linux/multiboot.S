@@ -76,14 +76,6 @@ ap_entry32:
 .code64
 bsp_entry64:
     ENTRY64_COMMON
-
-    # set RSP to boot stack
-    movabs  rsp, offset {boot_stack}
-    add     rsp, {boot_stack_size}
-
-    # call rust_entry(magic, mbi)
-    movabs  rax, offset {entry}
-    call    rax
     jmp     .Lhlt
 
 .code64
@@ -124,10 +116,9 @@ ap_entry64:
 .Ltmp_pml4:
     # 0x0000_0000 ~ 0xffff_ffff
     .quad .Ltmp_pdpt_low - {offset} + 0x3   # PRESENT | WRITABLE | paddr(tmp_pdpt)
-    .zero 8 * 255
-    # 0xffff_8000_0000_0000 ~ 0xffff_8000_ffff_ffff
+    .zero 8 * 510
+    # 0xffff_ff80_0000_0000 ~ 0xffff_ff80_ffff_ffff
     .quad .Ltmp_pdpt_high - {offset} + 0x3  # PRESENT | WRITABLE | paddr(tmp_pdpt)
-    .zero 8 * 255
 
 # FIXME: may not work on macOS using hvf as the CPU does not support 1GB page (pdpe1gb)
 .Ltmp_pdpt_low:
@@ -138,8 +129,6 @@ ap_entry64:
     .zero 8 * 508
 
 .Ltmp_pdpt_high:
-    .quad 0x40000000 | 0x83       # PRESENT | WRITABLE | HUGE_PAGE | paddr(0x4000_0000)
-    # .quad 0x40000000 | 0x83     # PRESENT | WRITABLE | HUGE_PAGE | paddr(0x4000_0000)
-    # .quad 0x80000000 | 0x83     # PRESENT | WRITABLE | HUGE_PAGE | paddr(0x8000_0000)
-    # .quad 0xc0000000 | 0x83     # PRESENT | WRITABLE | HUGE_PAGE | paddr(0xc000_0000)
+    # 0xffff_ff80_0000_0000 to 0x4000_0000
+    .quad 0x40000000 | 0x83     # PRESENT | WRITABLE | HUGE_PAGE | paddr(0x4000_0000)
     .zero 8 * 511

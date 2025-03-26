@@ -12,10 +12,10 @@ pub mod time;
 // mods for vmm usage.
 // mod percpu;
 
-mod config;
+pub mod config;
 mod consts;
-mod context;
-mod header;
+pub mod context;
+pub mod header;
 
 // #[cfg(feature = "smp")]
 pub mod mp;
@@ -28,8 +28,6 @@ pub mod irq {
 pub mod console {
     pub use super::uart16550::*;
 }
-
-pub use context::get_linux_context_list;
 
 use core::sync::atomic::{AtomicI32, AtomicU32, Ordering};
 
@@ -114,6 +112,9 @@ fn vmm_secondary_init(_cpu_id: usize) {
     }
 }
 
+/// Cores entered from Linux will call this function.
+/// Cores reserved for ArceOS for other purposed will be shutdown by Linux
+/// before entry and restarted through SIPI by ArceOS's `start_secondary_cpu` in mp.rs.
 extern "sysv64" fn vmm_cpu_entry(core_id: usize, linux_sp: usize) -> i32 {
     let cpu_id = current_cpu_id();
 
@@ -166,33 +167,23 @@ extern "sysv64" fn vmm_cpu_entry(core_id: usize, linux_sp: usize) -> i32 {
             rust_main_secondary(cpu_id);
         }
     }
-
-    let code = 0;
-    println!(
-        "{} CPU {} return back to driver with code {}.",
-        if is_primary { "Primary" } else { "Secondary" },
-        cpu_id,
-        code
-    );
-    code
 }
 
-unsafe extern "C" fn rust_entry(_magic: usize, _mbi: usize) {
-    // TODO: handle multiboot info
-    // if magic == self::boot::MULTIBOOT_BOOTLOADER_MAGIC {
-    //     crate::mem::clear_bss();
-    //     crate::cpu::init_primary(current_cpu_id());
-    //     self::uart16550::init();
-    //     self::dtables::init_primary();
-    //     self::time::init_early();
-    //     rust_main(current_cpu_id(), 0);
-    // }
+/// Core reserved for ArceOS will entered through this function.
+unsafe extern "C" fn rust_entry_secondary(magic: usize) {
+    // #[cfg(feature = "smp")]
+    if magic == self::boot::MULTIBOOT_BOOTLOADER_MAGIC {
+        // Note: DO not call log related functions before percpu area is initialized.
+        crate::cpu::init_secondary(current_cpu_id());
+        self::dtables::init_secondary();
+        unsafe {
+            rust_main_secondary(current_cpu_id());
+        }
+    }
 }
 
 /// Initializes the platform devices for the primary CPU.
 pub fn platform_init() {
-    self::lapic::init();
-
     // Consruct LAPIC but DO NOT operate the LAPIC.
     // because the LAPIC belongs to Linux, we should not touch it.
     self::apic::init_primary(false);
