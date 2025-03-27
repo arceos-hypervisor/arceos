@@ -4,7 +4,6 @@ use lazyinit::LazyInit;
 
 use crate::arch::{GdtStruct, IdtStruct, TaskStateSegment};
 
-
 static IDT: LazyInit<IdtStruct> = LazyInit::new();
 
 #[percpu::def_percpu]

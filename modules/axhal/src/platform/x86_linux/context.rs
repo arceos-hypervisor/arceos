@@ -22,6 +22,5 @@ pub fn set_linux_context(linux_sp: usize, cpu_id: usize) {
 }
 
 pub fn get_linux_context_list() -> &'static [LinuxContext; SMP] {
-    // LINUX_CTX_LIST.as_ref()
     unsafe { &*(&raw const LINUX_CTX_LIST as *const [LinuxContext; SMP]) }
 }

@@ -18,7 +18,6 @@ pub fn start_secondary_cpus(primary_cpu_id: usize) {
             }));
 
             debug!("starting CPU {}...", i);
-            let current_entered_cpus = ENTERED_CPUS.load(Ordering::Acquire);
             let should_wait = axhal::mp::start_secondary_cpu(i, stack_top);
             logic_cpu_id += 1;
 

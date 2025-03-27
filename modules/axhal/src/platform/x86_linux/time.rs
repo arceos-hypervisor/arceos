@@ -79,6 +79,9 @@ pub(super) fn init_early() {
     }
 }
 
+/// Currently we just passthrough the Lapic to host Linux.
+/// We can just enable APIC timer on CPUs that are reserved for ArceOS itself.
+#[allow(unused)]
 pub(super) fn init_primary() {
     #[cfg(feature = "irq")]
     unsafe {
@@ -96,6 +99,7 @@ pub(super) fn init_primary() {
     }
 }
 
+#[allow(unused)]
 #[cfg(feature = "smp")]
 pub(super) fn init_secondary() {
     #[cfg(feature = "irq")]

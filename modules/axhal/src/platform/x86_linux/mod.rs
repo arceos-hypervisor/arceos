@@ -10,8 +10,6 @@ pub mod misc;
 pub mod time;
 
 // mods for vmm usage.
-// mod percpu;
-
 pub mod config;
 mod consts;
 pub mod context;

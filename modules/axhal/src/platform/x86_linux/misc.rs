@@ -8,9 +8,7 @@ pub fn terminate() -> ! {
     axlog::ax_println!("\nMaybe we need to find a way to return this core to Linux?\n");
 
     // #[cfg(platform = "x86_64-qemu-q35")]
-    unsafe {
-        PortWriteOnly::new(0x604).write(0x2000u16)
-    };
+    unsafe { PortWriteOnly::new(0x604).write(0x2000u16) };
 
     crate::arch::halt();
     warn!("It should shutdown!");
