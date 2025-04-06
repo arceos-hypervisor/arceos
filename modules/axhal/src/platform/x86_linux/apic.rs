@@ -89,7 +89,7 @@ fn cpu_has_x2apic() -> bool {
     }
 }
 
-pub(super) fn init_primary(enabled: bool) {
+pub(super) fn init_primary(enabled: bool, cpu_id: usize) {
     info!("Initialize Local APIC...");
 
     if enabled {
@@ -121,7 +121,7 @@ pub(super) fn init_primary(enabled: bool) {
             lapic.enable();
         }
 
-        APIC_TO_CPU_ID[lapic.id() as usize] = 0;
+        APIC_TO_CPU_ID[lapic.id() as usize] = cpu_id as u32;
 
         LOCAL_APIC.get().as_mut().unwrap().write(lapic);
     }
@@ -132,7 +132,7 @@ pub(super) fn init_primary(enabled: bool) {
 }
 
 #[cfg(feature = "smp")]
-pub(super) fn init_secondary(enabled: bool) {
+pub(super) fn init_secondary(enabled: bool, cpu_id: usize) {
     let lapic = local_apic();
 
     if enabled {
@@ -141,7 +141,7 @@ pub(super) fn init_secondary(enabled: bool) {
         }
     }
     unsafe {
-        APIC_TO_CPU_ID[lapic.id() as usize] = 0;
+        APIC_TO_CPU_ID[lapic.id() as usize] = cpu_id as u32;
     };
 }
 
@@ -149,5 +149,13 @@ pub(super) fn init_secondary(enabled: bool) {
 /// The APIC ID is reserved if it entered Linux, which has set the corresponding
 /// entry in `APIC_TO_CPU_ID` to 0.
 pub(super) fn apic_id_is_reserved(apic_id: usize) -> bool {
-    unsafe { APIC_TO_CPU_ID[apic_id] == 0 }
+    unsafe { APIC_TO_CPU_ID[apic_id] != u32::MAX }
+}
+
+pub(super) fn apic_to_cpu_id(apic_id: u32) -> u32 {
+    if apic_id <= MAX_APIC_ID {
+        unsafe { APIC_TO_CPU_ID[apic_id as usize] }
+    } else {
+        u32::MAX
+    }
 }

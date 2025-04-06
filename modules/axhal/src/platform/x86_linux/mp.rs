@@ -58,7 +58,11 @@ where
 pub fn start_secondary_cpu(apic_id: usize, stack_top: PhysAddr) -> bool {
     // DO not boot CPUs that are reserved for host Linux.
     if super::apic::apic_id_is_reserved(apic_id) {
-        info!("CPU {} is reserved for Linux, skip", apic_id);
+        info!(
+            "CPU {} APIC id {} is reserved for Linux, skip",
+            super::apic::apic_to_cpu_id(apic_id as u32),
+            apic_id
+        );
         return false;
     }
 

@@ -143,7 +143,13 @@ impl GlobalAllocator {
     /// `align_pow2` must be a power of 2, and the returned region bound will be
     /// aligned to it.
     pub fn alloc_pages(&self, num_pages: usize, align_pow2: usize) -> AllocResult<usize> {
-        self.palloc.lock().alloc_pages(num_pages, align_pow2)
+        let res = self.palloc.lock().alloc_pages(num_pages, align_pow2);
+
+        if res.is_err() {
+            warn!("alloc_pages res {:?}", res);
+        }
+
+        res
     }
 
     /// Allocates contiguous pages starting from the given address.

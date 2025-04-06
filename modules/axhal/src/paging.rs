@@ -42,8 +42,19 @@ impl PagingHandler for PagingHandlerImpl {
             .ok()
     }
 
+    fn alloc_frames(count: usize, align_pow2: usize) -> Option<PhysAddr> {
+        global_allocator()
+            .alloc_pages(count, align_pow2)
+            .map(|vaddr| virt_to_phys(vaddr.into()))
+            .ok()
+    }
+
     fn dealloc_frame(paddr: PhysAddr) {
         global_allocator().dealloc_pages(phys_to_virt(paddr).as_usize(), 1)
+    }
+
+    fn dealloc_frames(paddr: PhysAddr, count: usize) {
+        global_allocator().dealloc_pages(phys_to_virt(paddr).as_usize(), count)
     }
 
     #[inline]
