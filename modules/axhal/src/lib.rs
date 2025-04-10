@@ -82,3 +82,4 @@ pub use self::platform::config as hvconfig;
 pub use self::platform::context::get_linux_context_list;
 pub use self::platform::header as hvheader;
 pub use self::platform::mem::host_memory_regions;
+pub use self::platform::mp::shutdown_secondary_cpus;

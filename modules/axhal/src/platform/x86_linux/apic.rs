@@ -33,6 +33,8 @@ static IO_APIC: LazyInit<SpinNoIrq<IoApic>> = LazyInit::new();
 
 const MAX_APIC_ID: u32 = 254;
 static mut APIC_TO_CPU_ID: [u32; MAX_APIC_ID as usize + 1] = [u32::MAX; MAX_APIC_ID as usize + 1];
+static mut APIC_ID_IS_RESERVED: [bool; MAX_APIC_ID as usize + 1] =
+    [false; MAX_APIC_ID as usize + 1];
 
 /// Enables or disables the given IRQ.
 #[cfg(feature = "irq")]
@@ -121,7 +123,11 @@ pub(super) fn init_primary(enabled: bool, cpu_id: usize) {
             lapic.enable();
         }
 
-        APIC_TO_CPU_ID[lapic.id() as usize] = cpu_id as u32;
+        let apic_id = lapic.id();
+        APIC_TO_CPU_ID[apic_id as usize] = cpu_id as u32;
+        if crate::cpu::this_cpu_is_reserved() {
+            APIC_ID_IS_RESERVED[apic_id as usize] = true;
+        }
 
         LOCAL_APIC.get().as_mut().unwrap().write(lapic);
     }
@@ -141,7 +147,11 @@ pub(super) fn init_secondary(enabled: bool, cpu_id: usize) {
         }
     }
     unsafe {
-        APIC_TO_CPU_ID[lapic.id() as usize] = cpu_id as u32;
+        let apic_id = lapic.id();
+        APIC_TO_CPU_ID[apic_id as usize] = cpu_id as u32;
+        if crate::cpu::this_cpu_is_reserved() {
+            APIC_ID_IS_RESERVED[apic_id as usize] = true;
+        }
     };
 }
 
@@ -149,7 +159,7 @@ pub(super) fn init_secondary(enabled: bool, cpu_id: usize) {
 /// The APIC ID is reserved if it entered Linux, which has set the corresponding
 /// entry in `APIC_TO_CPU_ID` to 0.
 pub(super) fn apic_id_is_reserved(apic_id: usize) -> bool {
-    unsafe { APIC_TO_CPU_ID[apic_id] != u32::MAX }
+    unsafe { APIC_ID_IS_RESERVED[apic_id as usize] }
 }
 
 pub(super) fn apic_to_cpu_id(apic_id: u32) -> u32 {
@@ -157,5 +167,14 @@ pub(super) fn apic_to_cpu_id(apic_id: u32) -> u32 {
         unsafe { APIC_TO_CPU_ID[apic_id as usize] }
     } else {
         u32::MAX
+    }
+}
+
+/// Shuts down the target CPU by sending an INIT IPI to it.
+pub(super) fn shutdown_ap(apic_id: u32) {
+    info!("Shutting down ArceOS cpu {apic_id}...");
+    let apic_id = raw_apic_id(apic_id as u8);
+    unsafe {
+        local_apic().send_init_ipi(apic_id);
     }
 }

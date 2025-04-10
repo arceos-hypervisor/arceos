@@ -1,5 +1,4 @@
 mod apic;
-
 mod boot;
 mod dtables;
 mod entry;
@@ -70,6 +69,7 @@ fn vmm_primary_init_early(cpu_id: usize) {
     // Because currently the image was loaded by Linux.
     // crate::mem::clear_bss();
     crate::cpu::init_primary(cpu_id);
+    crate::cpu::set_this_cpu_is_reserved();
     self::uart16550::init();
 }
 
@@ -78,6 +78,7 @@ fn vmm_secondary_init_early(cpu_id: usize) {
     {
         println!("Secondary CPU {} init early.", cpu_id);
         crate::cpu::init_secondary(cpu_id);
+        crate::cpu::set_this_cpu_is_reserved();
     }
 }
 

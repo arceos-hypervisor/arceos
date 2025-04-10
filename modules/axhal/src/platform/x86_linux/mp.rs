@@ -1,3 +1,5 @@
+use core::sync::atomic::AtomicBool;
+
 use memory_addr::VirtAddr;
 
 use crate::mem::{PAGE_SIZE_4K, PhysAddr, phys_to_virt, virt_to_phys};
@@ -84,4 +86,26 @@ pub fn start_secondary_cpu(apic_id: usize, stack_top: PhysAddr) -> bool {
     unsafe { setup_startup_page(stack_top, boot_fn) };
 
     return true;
+}
+
+static SHUTDOWN_SECONDARY_CPUS: AtomicBool = AtomicBool::new(false);
+
+pub fn shutdown_secondary_cpus() {
+    // Only need to shutdown secondary CPUs once.
+    if SHUTDOWN_SECONDARY_CPUS.load(core::sync::atomic::Ordering::SeqCst) {
+        return;
+    }
+
+    SHUTDOWN_SECONDARY_CPUS.store(true, core::sync::atomic::Ordering::SeqCst);
+
+    info!("Shutting down secondary CPUs...");
+
+    for cpuid in 0..axconfig::SMP {
+        // DO not shutdown CPUs that are reserved for host Linux.
+        if super::apic::apic_id_is_reserved(cpuid) {
+            continue;
+        }
+        debug!("Trying to shut down CPU {}", cpuid);
+        super::apic::shutdown_ap(cpuid as u32);
+    }
 }

@@ -9,6 +9,9 @@ static IS_BSP: bool = false;
 #[percpu::def_percpu]
 static CURRENT_TASK_PTR: usize = 0;
 
+#[percpu::def_percpu]
+static IS_RESERVED: bool = false;
+
 /// Returns the ID of the current CPU.
 #[inline]
 pub fn this_cpu_id() -> usize {
@@ -20,6 +23,19 @@ pub fn this_cpu_id() -> usize {
 #[inline]
 pub fn this_cpu_is_bsp() -> bool {
     IS_BSP.read_current()
+}
+
+/// Returns whether the current CPU is reserved for Linux.
+#[inline]
+pub fn this_cpu_is_reserved() -> bool {
+    IS_RESERVED.read_current()
+}
+
+/// Sets the current CPU as reserved for Linux.
+/// Only called from initialization code related to boot for Linux.
+#[inline]
+pub fn set_this_cpu_is_reserved() {
+    IS_RESERVED.write_current(true);
 }
 
 /// Gets the pointer to the current task with preemption-safety.
