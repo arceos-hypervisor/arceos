@@ -159,7 +159,7 @@ pub(super) fn init_secondary(enabled: bool, cpu_id: usize) {
 /// The APIC ID is reserved if it entered Linux, which has set the corresponding
 /// entry in `APIC_TO_CPU_ID` to 0.
 pub(super) fn apic_id_is_reserved(apic_id: usize) -> bool {
-    unsafe { APIC_ID_IS_RESERVED[apic_id as usize] }
+    unsafe { APIC_ID_IS_RESERVED[apic_id] }
 }
 
 pub(super) fn apic_to_cpu_id(apic_id: u32) -> u32 {
@@ -168,6 +168,15 @@ pub(super) fn apic_to_cpu_id(apic_id: u32) -> u32 {
     } else {
         u32::MAX
     }
+}
+
+pub(super) fn cpu_id_to_apic_id(cpu_id: usize) -> Option<u32> {
+    for (apic_id, id) in unsafe { APIC_TO_CPU_ID.iter().enumerate() } {
+        if *id == cpu_id as u32 {
+            return Some(apic_id as u32);
+        }
+    }
+    None
 }
 
 /// Shuts down the target CPU by sending an INIT IPI to it.
