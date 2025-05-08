@@ -40,6 +40,12 @@ fn x86_trap_handler(tf: &TrapFrame) {
         IRQ_VECTOR_START..=IRQ_VECTOR_END => {
             handle_trap!(IRQ, tf.vector as _);
         }
+        NONMASKABLE_INTERRUPT_VECTOR => {
+            // warn!(
+            //     "#NMI @ {:#x}, error_code={:#x}:\n{:#x?}",
+            //     tf.rip, tf.error_code, tf
+            // );
+        }
         _ => {
             panic!(
                 "Unhandled exception {} ({}, error_code={:#x}) @ {:#x}:\n{:#x?}",

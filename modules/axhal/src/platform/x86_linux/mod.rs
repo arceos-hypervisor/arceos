@@ -34,6 +34,8 @@ use config::HvSystemConfig;
 // use error::HvResult;
 use header::HvHeader;
 
+use crate::cpu::this_cpu_id;
+
 static VMM_PRIMARY_INIT_OK: AtomicU32 = AtomicU32::new(0);
 static ERROR_NUM: AtomicI32 = AtomicI32::new(0);
 
@@ -63,26 +65,26 @@ fn current_cpu_id() -> usize {
     }
 }
 
-fn vmm_primary_init_early(cpu_id: usize) {
-    println!("Primary CPU {} init early", cpu_id);
+fn vmm_primary_init_early(core_id: usize) {
+    println!("Primary CPU {} init early", core_id);
     // We do not clear bss here.
     // Because currently the image was loaded by Linux.
     // crate::mem::clear_bss();
-    crate::cpu::init_primary(cpu_id);
+    crate::cpu::init_primary(core_id);
     crate::cpu::set_this_cpu_is_reserved();
     self::uart16550::init();
 }
 
-fn vmm_secondary_init_early(cpu_id: usize) {
+fn vmm_secondary_init_early(core_id: usize) {
     #[cfg(feature = "smp")]
     {
-        println!("Secondary CPU {} init early.", cpu_id);
-        crate::cpu::init_secondary(cpu_id);
+        println!("Secondary CPU {} init early.", core_id);
+        crate::cpu::init_secondary(core_id);
         crate::cpu::set_this_cpu_is_reserved();
     }
 }
 
-fn vmm_primary_init(cpu_id: usize) {
+fn vmm_primary_init(core_id: usize) {
     self::dtables::init_primary();
     self::time::init_early();
 
@@ -98,7 +100,7 @@ fn vmm_primary_init(cpu_id: usize) {
         config_signature = {:?}\n\
         config_revision = {}\n\
         ",
-        cpu_id,
+        core_id,
         core::str::from_utf8(&system_config.signature),
         system_config.revision,
     );
@@ -143,27 +145,27 @@ extern "sysv64" fn vmm_cpu_entry(core_id: usize, linux_sp: usize) -> i32 {
 
     // First, we init primary core for VMM.
     if is_primary {
-        vmm_primary_init_early(cpu_id);
+        vmm_primary_init_early(core_id);
     } else {
         wait_while(|| VMM_PRIMARY_INIT_OK.load(Ordering::Acquire) == 0);
-        vmm_secondary_init_early(cpu_id);
+        vmm_secondary_init_early(core_id);
     }
 
     // Note: this has to be done after `cpu::init_primary`.
     // Because LinuxContext will be stored in percpu area.
-    context::set_linux_context(linux_sp, cpu_id);
+    context::set_linux_context(linux_sp, core_id);
 
     if is_primary {
-        vmm_primary_init(cpu_id);
+        vmm_primary_init(core_id);
     } else {
-        vmm_secondary_init(cpu_id);
+        vmm_secondary_init(core_id);
     }
 
     unsafe {
         if is_primary {
-            rust_main(cpu_id, 0);
+            rust_main(core_id, 0);
         } else {
-            rust_main_secondary(cpu_id);
+            rust_main_secondary(core_id);
         }
     }
 }
@@ -173,22 +175,26 @@ unsafe extern "C" fn rust_entry_secondary(magic: usize) {
     // #[cfg(feature = "smp")]
     if magic == self::boot::MULTIBOOT_BOOTLOADER_MAGIC {
         let cpu_id = current_cpu_id();
+        let core_id = entry::generate_core_id() as usize;
+        info!("ArceOS's Core {} (LAPIC_ID {}) entered.", core_id, cpu_id);
+
         // Note: DO not call log related functions before percpu area is initialized.
-        crate::cpu::init_secondary(cpu_id);
+        crate::cpu::init_secondary(core_id);
         self::dtables::init_secondary();
         unsafe {
-            rust_main_secondary(cpu_id);
+            rust_main_secondary(core_id);
         }
     }
 }
 
 /// Initializes the platform devices for the primary CPU.
 pub fn platform_init() {
-    let cpu_id = current_cpu_id();
+    // let cpu_id = current_cpu_id();
+    let core_id = this_cpu_id();
 
     // Consruct LAPIC but DO NOT operate the LAPIC.
     // because the LAPIC belongs to Linux, we should not touch it.
-    self::apic::init_primary(false, cpu_id);
+    self::apic::init_primary(false, core_id);
     // self::time::init_primary();
 
     VMM_PRIMARY_INIT_OK.store(1, Ordering::Release);
@@ -198,8 +204,9 @@ pub fn platform_init() {
 /// Initializes the platform devices for secondary CPUs.
 #[cfg(feature = "smp")]
 pub fn platform_init_secondary() {
-    let cpu_id = current_cpu_id();
+    // let cpu_id = current_cpu_id();
+    let core_id = this_cpu_id();
 
-    self::apic::init_secondary(false, cpu_id);
+    self::apic::init_secondary(false, core_id);
     // self::time::init_secondary();
 }

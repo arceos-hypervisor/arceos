@@ -91,8 +91,8 @@ fn cpu_has_x2apic() -> bool {
     }
 }
 
-pub(super) fn init_primary(enabled: bool, cpu_id: usize) {
-    info!("Initialize Local APIC...");
+pub(super) fn init_primary(enabled: bool, core_id: usize) {
+    info!("Core {core_id} Initialize Local APIC...");
 
     if enabled {
         unsafe {
@@ -124,7 +124,7 @@ pub(super) fn init_primary(enabled: bool, cpu_id: usize) {
         }
 
         let apic_id = lapic.id();
-        APIC_TO_CPU_ID[apic_id as usize] = cpu_id as u32;
+        APIC_TO_CPU_ID[apic_id as usize] = core_id as u32;
         if crate::cpu::this_cpu_is_reserved() {
             APIC_ID_IS_RESERVED[apic_id as usize] = true;
         }
@@ -138,7 +138,7 @@ pub(super) fn init_primary(enabled: bool, cpu_id: usize) {
 }
 
 #[cfg(feature = "smp")]
-pub(super) fn init_secondary(enabled: bool, cpu_id: usize) {
+pub(super) fn init_secondary(enabled: bool, core_id: usize) {
     let lapic = local_apic();
 
     if enabled {
@@ -148,7 +148,7 @@ pub(super) fn init_secondary(enabled: bool, cpu_id: usize) {
     }
     unsafe {
         let apic_id = lapic.id();
-        APIC_TO_CPU_ID[apic_id as usize] = cpu_id as u32;
+        APIC_TO_CPU_ID[apic_id as usize] = core_id as u32;
         if crate::cpu::this_cpu_is_reserved() {
             APIC_ID_IS_RESERVED[apic_id as usize] = true;
         }
@@ -177,6 +177,47 @@ pub(super) fn cpu_id_to_apic_id(cpu_id: usize) -> Option<u32> {
         }
     }
     None
+}
+
+pub(super) fn cpu_id_speculate_apic_id(cpu_id: usize) -> u32 {
+    for (apic_id, id) in unsafe { APIC_TO_CPU_ID.iter().enumerate() } {
+        if *id == cpu_id as u32 {
+            return apic_id as u32;
+        }
+    }
+
+    // Ouch, we have to speculate the APIC ID.
+    // This is not a good idea, but we have no choice.
+
+    let mut core_id_sum = 0;
+    let mut apic_id_sum = 0;
+
+    for core_id in 0..3 {
+        match cpu_id_to_apic_id(core_id) {
+            Some(apic_id) => {
+                core_id_sum += core_id as u32;
+                apic_id_sum += apic_id;
+            }
+            None => {}
+        };
+    }
+
+    let apic_id = match apic_id_sum {
+        0 => cpu_id as u32,
+        _ => {
+            let apic_id = (apic_id_sum / core_id_sum) * cpu_id as u32;
+            if apic_id > MAX_APIC_ID {
+                warn!("Speculated APIC ID {apic_id} is too large, using cpu_id {cpu_id}");
+                cpu_id as u32
+            } else {
+                apic_id
+            }
+        }
+    };
+
+    warn!("Speculating APIC ID for CPU {cpu_id} as {apic_id}");
+
+    apic_id
 }
 
 /// Shuts down the target CPU by sending an INIT IPI to it.

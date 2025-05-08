@@ -17,7 +17,7 @@ pub fn start_secondary_cpus(primary_cpu_id: usize) {
                 SECONDARY_BOOT_STACK[logic_cpu_id].as_ptr_range().end as usize
             }));
 
-            debug!("starting CPU {}...", i);
+            debug!("Primary CPU {} starting CPU [{}]...", primary_cpu_id, i);
             let should_wait = axhal::mp::start_secondary_cpu(i, stack_top);
             logic_cpu_id += 1;
 

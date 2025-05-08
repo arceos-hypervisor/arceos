@@ -90,20 +90,20 @@ pub unsafe fn set_current_task_ptr<T>(ptr: *const T) {
 }
 
 #[allow(dead_code)]
-pub(crate) fn init_primary(cpu_id: usize) {
+pub(crate) fn init_primary(core_id: usize) {
     percpu::init(axconfig::SMP);
-    percpu::set_local_thread_pointer(cpu_id);
+    percpu::set_local_thread_pointer(core_id);
     unsafe {
-        CPU_ID.write_current_raw(cpu_id);
+        CPU_ID.write_current_raw(core_id);
         IS_BSP.write_current_raw(true);
     }
 }
 
 #[allow(dead_code)]
-pub(crate) fn init_secondary(cpu_id: usize) {
-    percpu::set_local_thread_pointer(cpu_id);
+pub(crate) fn init_secondary(core_id: usize) {
+    percpu::set_local_thread_pointer(core_id);
     unsafe {
-        CPU_ID.write_current_raw(cpu_id);
+        CPU_ID.write_current_raw(core_id);
         IS_BSP.write_current_raw(false);
     }
 }

@@ -57,22 +57,26 @@ where
 
 /// Starts the given secondary CPU with its boot stack.
 /// Returns true if the caller should wait for the CPU to be ready.
-pub fn start_secondary_cpu(apic_id: usize, stack_top: PhysAddr) -> bool {
+pub fn start_secondary_cpu(core_id: usize, stack_top: PhysAddr) -> bool {
     // DO not boot CPUs that are reserved for host Linux.
-    if super::apic::apic_id_is_reserved(apic_id) {
+    if super::context::core_id_is_reserved(core_id) {
         info!(
-            "CPU {} APIC id {} is reserved for Linux, skip",
-            super::apic::apic_to_cpu_id(apic_id as u32),
-            apic_id
+            "Core [{}] APIC id {:?} is reserved for Linux, skip",
+            core_id,
+            super::apic::cpu_id_to_apic_id(core_id),
         );
         return false;
     }
+
+    // This is totally hack.
+    let apic_id = super::apic::cpu_id_speculate_apic_id(core_id);
+    // let apic_id = core_id;
 
     let boot_fn = || {
         let apic_id = super::apic::raw_apic_id(apic_id as u8);
         let lapic = super::apic::local_apic();
 
-        info!("Starting secondary CPU {}", apic_id);
+        info!("Starting secondary Core [{}] APIC_ID {}", core_id, apic_id);
 
         // INIT-SIPI-SIPI Sequence
         // Ref: Intel SDM Vol 3C, Section 8.4.4, MP Initialization Example
@@ -98,14 +102,33 @@ pub fn shutdown_secondary_cpus() {
 
     SHUTDOWN_SECONDARY_CPUS.store(true, core::sync::atomic::Ordering::SeqCst);
 
-    info!("Shutting down secondary CPUs...");
+    info!("Shutting down ArceOS's secondary CPUs...");
 
-    for cpuid in 0..axconfig::SMP {
+    for core_id in 0..axconfig::SMP {
         // DO not shutdown CPUs that are reserved for host Linux.
-        if super::apic::apic_id_is_reserved(cpuid) {
+        if super::context::core_id_is_reserved(core_id) {
+            info!(
+                "Core [{}] APIC id {:?} is reserved for Linux, skip",
+                core_id,
+                super::apic::cpu_id_to_apic_id(core_id),
+            );
             continue;
         }
-        debug!("Trying to shut down CPU {}", cpuid);
-        super::apic::shutdown_ap(cpuid as u32);
+
+        match super::apic::cpu_id_to_apic_id(core_id) {
+            Some(apic_id) => {
+                info!(
+                    "Shutting down ArceOS's secondary CPU {} APIC id {}",
+                    core_id, apic_id
+                );
+                super::apic::shutdown_ap(apic_id);
+            }
+            None => {
+                warn!(
+                    "Shutting down ArceOS's secondary CPU {} APIC id unknown",
+                    core_id
+                );
+            }
+        };
     }
 }

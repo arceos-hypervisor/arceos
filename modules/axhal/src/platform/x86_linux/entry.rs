@@ -12,6 +12,10 @@ pub fn entered_cpus() -> u32 {
     ENTERED_CPUS.load(Ordering::Acquire)
 }
 
+pub(super) fn generate_core_id() -> u32 {
+    ENTERED_CPUS.fetch_add(1, Ordering::SeqCst)
+}
+
 #[unsafe(link_section = ".text.boot")]
 unsafe extern "sysv64" fn switch_stack(linux_sp: usize) -> i32 {
     unsafe {
@@ -31,7 +35,7 @@ unsafe extern "sysv64" fn switch_stack(linux_sp: usize) -> i32 {
 
             // Note: cpu_id here is not Local APIC ID, it is the index of entered CPUs.
             // We just use it here to choose VMM_BOOT_STACK.
-            let core_id = ENTERED_CPUS.fetch_add(1, Ordering::SeqCst);
+            let core_id = generate_core_id();
 
             let hv_sp = VMM_BOOT_STACK[core_id as usize].as_ptr_range().end as usize;
             let ret;
