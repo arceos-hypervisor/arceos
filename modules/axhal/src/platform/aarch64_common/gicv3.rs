@@ -1,7 +1,6 @@
 use crate::{arch::disable_irqs, irq::IrqHandler, mem::phys_to_virt};
 use arm_gic_driver::*;
 use core::ptr::NonNull;
-// use arm_gic_driver::{InterruptType, translate_irq};
 use axconfig::devices::{GICC_PADDR, GICD_PADDR, GICR_PADDR, UART_IRQ};
 use kspin::SpinNoIrq;
 use memory_addr::PhysAddr;
@@ -11,15 +10,15 @@ pub const MAX_IRQ_COUNT: usize = 1024;
 
 #[cfg(not(feature = "hv"))]
 /// The timer IRQ number.
-pub const TIMER_IRQ_NUM: usize = translate_irq(14, InterruptType::PPI).unwrap() as usize;
+pub const TIMER_IRQ_NUM: usize = arm_gic_driver::IntId::ppi(14).to_u32() as usize;
 
 #[cfg(feature = "hv")]
 /// Non-secure EL2 Physical Timer irq number.
-pub const TIMER_IRQ_NUM: usize = translate_irq(10, InterruptType::PPI).unwrap() as usize;
+pub const TIMER_IRQ_NUM: usize = arm_gic_driver::IntId::ppi(10).to_u32() as usize;
+
 
 /// The UART IRQ number.
-pub const UART_IRQ_NUM: usize =
-    translate_irq(UART_IRQ as u32, InterruptType::SPI).unwrap() as usize;
+pub const UART_IRQ_NUM: usize = arm_gic_driver::IntId::spi(UART_IRQ as u32).to_u32() as usize;
 
 const GICD_BASE: PhysAddr = pa!(GICD_PADDR);
 const GICC_BASE: PhysAddr = pa!(GICR_PADDR);
@@ -54,7 +53,7 @@ pub fn fetch_irq() -> usize {
     GICC.lock()
         .as_mut()
         .unwrap()
-        .get_and_acknowledge_interrupt()
+        .ack()
         .unwrap_or_default()
         .into()
 }
@@ -67,7 +66,7 @@ pub fn fetch_irq() -> usize {
 pub fn dispatch_irq(_irq_no: usize) {
     let irq_no = fetch_irq();
     crate::irq::dispatch_irq_common(irq_no);
-    GICC.lock().as_mut().unwrap().end_interrupt(irq_no.into());
+    GICC.lock().as_mut().unwrap().eoi(irq_no.into());
 }
 
 /// Initializes GICD, GICC on the primary CPU.
@@ -78,7 +77,7 @@ pub(crate) fn init_primary() {
         NonNull::new(phys_to_virt(GICC_BASE).as_mut_ptr()).unwrap(),
         arm_gic_driver::v3::Security::OneNS,
     );
-    let interface = gicd.current_cpu_setup();
+    let interface = gicd.cpu_interface();
 
     GICD.lock().replace(gicd);
     GICC.lock().replace(interface);
@@ -89,6 +88,6 @@ pub(crate) fn init_primary() {
 /// Initializes GICC on secondary CPUs.
 #[cfg(feature = "smp")]
 pub(crate) fn init_secondary() {
-    let interface = GICD.lock().as_mut().unwrap().current_cpu_setup();
+    let interface = GICD.lock().as_mut().unwrap().cpu_interface();
     GICC.lock().replace(interface);
 }
