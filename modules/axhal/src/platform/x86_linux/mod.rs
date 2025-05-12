@@ -37,6 +37,7 @@ use header::HvHeader;
 use crate::cpu::this_cpu_id;
 
 static VMM_PRIMARY_INIT_OK: AtomicU32 = AtomicU32::new(0);
+static VMM_PLATFORM_INIT_OK: AtomicU32 = AtomicU32::new(0);
 static ERROR_NUM: AtomicI32 = AtomicI32::new(0);
 
 fn has_err() -> bool {
@@ -134,6 +135,8 @@ extern "sysv64" fn vmm_cpu_entry(core_id: usize, linux_sp: usize) -> i32 {
         vm_cpus
     );
 
+    context::set_linux_context(linux_sp, core_id);
+
     wait_while(|| entry::entered_cpus() < vm_cpus);
 
     println!(
@@ -150,10 +153,6 @@ extern "sysv64" fn vmm_cpu_entry(core_id: usize, linux_sp: usize) -> i32 {
         wait_while(|| VMM_PRIMARY_INIT_OK.load(Ordering::Acquire) == 0);
         vmm_secondary_init_early(core_id);
     }
-
-    // Note: this has to be done after `cpu::init_primary`.
-    // Because LinuxContext will be stored in percpu area.
-    context::set_linux_context(linux_sp, core_id);
 
     if is_primary {
         vmm_primary_init(core_id);
@@ -198,6 +197,11 @@ pub fn platform_init() {
     // self::time::init_primary();
 
     VMM_PRIMARY_INIT_OK.store(1, Ordering::Release);
+    VMM_PLATFORM_INIT_OK.fetch_add(1, Ordering::Relaxed);
+    wait_while(|| VMM_PLATFORM_INIT_OK.load(Ordering::Acquire) < HvHeader::get().reserved_cpus());
+
+    info!("Primary CPU {} platform_init OK.", core_id);
+
     // Secondary CPUs continue to initialize.
 }
 
@@ -208,5 +212,10 @@ pub fn platform_init_secondary() {
     let core_id = this_cpu_id();
 
     self::apic::init_secondary(false, core_id);
+
+    VMM_PLATFORM_INIT_OK.fetch_add(1, Ordering::Relaxed);
+    wait_while(|| VMM_PLATFORM_INIT_OK.load(Ordering::Acquire) < HvHeader::get().reserved_cpus());
+
+    info!("Secondary CPU {} platform_init OK.", core_id);
     // self::time::init_secondary();
 }
