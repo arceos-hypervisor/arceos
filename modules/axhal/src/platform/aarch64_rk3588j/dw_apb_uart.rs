@@ -165,5 +165,5 @@ pub fn getchar() -> Option<u8> {
 
 /// UART simply initialize
 pub fn init_early() {
-    UART.lock().init();
+    // UART.lock().init();
 }
