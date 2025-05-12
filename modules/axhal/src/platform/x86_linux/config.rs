@@ -158,17 +158,4 @@ impl Debug for CellConfig<'_> {
     }
 }
 
-pub fn cpu_is_reserved(cpu_id: usize) -> bool {
-    use super::apic::{apic_id_is_reserved, cpu_id_to_apic_id};
-    if cpu_id >= axconfig::SMP {
-        warn!("cpu_id {} is out of range", cpu_id);
-        return false;
-    }
-
-    if let Some(apic_id) = cpu_id_to_apic_id(cpu_id) {
-        return apic_id_is_reserved(apic_id as usize);
-    } else {
-        warn!("cpu_id {} is not mapped to apic id", cpu_id);
-        return false;
-    }
-}
+pub use super::context::core_id_is_reserved;

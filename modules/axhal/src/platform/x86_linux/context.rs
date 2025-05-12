@@ -29,5 +29,10 @@ pub fn get_linux_context_list() -> &'static [LinuxContext; SMP] {
 }
 
 pub fn core_id_is_reserved(core_id: usize) -> bool {
+    if core_id >= SMP {
+        warn!("core_id {} is out of range", core_id);
+        return false;
+    }
+
     unsafe { CORE_ID_IS_RESERVED[core_id] }
 }
