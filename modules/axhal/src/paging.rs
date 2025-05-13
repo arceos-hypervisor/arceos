@@ -69,13 +69,14 @@ cfg_if::cfg_if! {
     }
 }
 
-#[cfg_attr(feature = "plat-dyn", unsafe(link_section = ".percpu"))]
 static KERNEL_PAGE_TABLE_ROOT: LazyInit<PhysAddr> = LazyInit::new();
 
 /// Saves the root physical address of the kernel page table, which may be used
 /// on context switch.
 pub fn set_kernel_page_table_root(root_paddr: PhysAddr) {
     KERNEL_PAGE_TABLE_ROOT.call_once(|| root_paddr);
+    #[cfg(feature = "plat-dyn")]
+    somehal::mem::page::set_kernel_table(root_paddr.as_usize().into());
     unsafe { crate::arch::write_page_table_root(root_paddr) };
 }
 

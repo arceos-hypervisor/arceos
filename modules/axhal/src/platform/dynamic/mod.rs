@@ -24,7 +24,6 @@ fn main(_cpu_id: usize, cpu_idx: usize) -> ! {
         unsafe { rust_main(cpu_idx) };
     } else {
         crate::cpu::init_secondary(cpu_idx);
-        debug!("cpu {cpu_idx} entry");
         #[cfg(feature = "smp")]
         unsafe {
             rust_main_secondary(cpu_idx)

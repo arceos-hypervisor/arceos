@@ -12,7 +12,7 @@ use crate::mem::iomap;
 
 module_driver!(
     name: "GICv3",
-   level: ProbeLevel::PreKernel,
+    level: ProbeLevel::PreKernel,
     priority: ProbePriority::INTC,
     probe_kinds: &[
         ProbeKind::Fdt {
