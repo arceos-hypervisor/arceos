@@ -2,7 +2,6 @@
 
 #[cfg(feature = "plat-dyn")]
 pub use somehal::mp::cpu_list;
-use somehal::println;
 
 #[percpu::def_percpu]
 static CPU_ID: usize = 0;
@@ -16,14 +15,14 @@ static CURRENT_TASK_PTR: usize = 0;
 /// Returns the ID of the current CPU.
 #[inline]
 pub fn this_cpu_id() -> usize {
-    CPU_ID.read_current()
+    CPU_ID.read()
 }
 
 /// Returns whether the current CPU is the primary CPU (aka the bootstrap
 /// processor or BSP)
 #[inline]
 pub fn this_cpu_is_bsp() -> bool {
-    IS_BSP.read_current()
+    IS_BSP.read()
 }
 
 /// Stores the pointer to the current task in the SP_EL0 register.
@@ -33,7 +32,7 @@ pub fn this_cpu_is_bsp() -> bool {
 #[cfg(target_arch = "aarch64")]
 pub(crate) unsafe fn cache_current_task_ptr() {
     use tock_registers::interfaces::Writeable;
-    aarch64_cpu::registers::SP_EL0.set(unsafe { CURRENT_TASK_PTR.read_current_raw() } as u64);
+    aarch64_cpu::registers::SP_EL0.set(CURRENT_TASK_PTR.read() as u64);
 }
 
 /// Gets the pointer to the current task with preemption-safety.
@@ -78,7 +77,7 @@ pub fn current_task_ptr<T>() -> *const T {
 pub unsafe fn set_current_task_ptr<T>(ptr: *const T) {
     #[cfg(target_arch = "x86_64")]
     {
-        unsafe { CURRENT_TASK_PTR.write_current_raw(ptr as usize) }
+        unsafe { CURRENT_TASK_PTR.write_current(ptr as usize) }
     }
     #[cfg(any(
         target_arch = "riscv32",
@@ -87,13 +86,13 @@ pub unsafe fn set_current_task_ptr<T>(ptr: *const T) {
     ))]
     {
         let _guard = kernel_guard::IrqSave::new();
-        unsafe { CURRENT_TASK_PTR.write_current_raw(ptr as usize) }
+        unsafe { CURRENT_TASK_PTR.write_current(ptr as usize) }
     }
     #[cfg(target_arch = "aarch64")]
     {
         let _guard = kernel_guard::IrqSave::new();
         unsafe {
-            CURRENT_TASK_PTR.write_current_raw(ptr as usize);
+            CURRENT_TASK_PTR.write_current(ptr as usize);
             cache_current_task_ptr();
         }
     }
@@ -101,30 +100,17 @@ pub unsafe fn set_current_task_ptr<T>(ptr: *const T) {
 
 #[allow(dead_code)]
 pub(crate) fn init_primary(cpu_id: usize) {
-    percpu::init();
-    percpu::init_percpu_reg(cpu_id);
+    percpu::init(cpu_id);
 
-    let base = percpu::percpu_area_base(cpu_id);
-    println!("base: {:#x}", base);
-
-    println!("ptr: {:p}", unsafe { &raw const __PERCPU_CPU_ID });
-
-    println!("offset {:#x}", CPU_ID.offset());
-    println!("ptr: {:p}", unsafe { CPU_ID.current_ptr() });
-
-    unsafe {
-        CPU_ID.write_current_raw(cpu_id);
-        IS_BSP.write_current_raw(true);
-    }
+    CPU_ID.write_current(cpu_id);
+    IS_BSP.write_current(true);
     crate::arch::cpu_init();
 }
 
 #[allow(dead_code)]
 pub(crate) fn init_secondary(cpu_id: usize) {
-    percpu::init_percpu_reg(cpu_id);
-    unsafe {
-        CPU_ID.write_current_raw(cpu_id);
-        IS_BSP.write_current_raw(false);
-    }
+    percpu::init(cpu_id);
+    CPU_ID.write_current(cpu_id);
+    IS_BSP.write_current(false);
     crate::arch::cpu_init();
 }

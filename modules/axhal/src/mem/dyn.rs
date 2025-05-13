@@ -4,7 +4,6 @@ use alloc::{boxed::Box, format};
 use axerrno::AxError;
 use memory_addr::{MemoryAddr, PhysAddr, VirtAddr};
 use page_table_entry::MappingFlags;
-pub use somehal::mem::percpu_all;
 use somehal::mem::region::{AccessFlags, MemRegionKind};
 
 use super::{MemRegion, MemRegionFlags};

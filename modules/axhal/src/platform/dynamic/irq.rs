@@ -13,8 +13,6 @@ pub(crate) unsafe fn init() {
     let chip = somehal::driver::get_dev!(Intc).unwrap();
 
     unsafe { IRQ_CHIP = (chip.descriptor.device_id).into() };
-
-    crate::platform::irq::set_enable(somehal::systime::get().irq(), true);
 }
 
 #[cfg(feature = "smp")]

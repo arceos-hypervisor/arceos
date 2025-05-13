@@ -19,7 +19,6 @@ use lazyinit::LazyInit;
 use memory_addr::{PhysAddr, VirtAddr};
 use memory_set::MappingError;
 
-#[cfg_attr(feature = "percpu", unsafe(link_section = ".percpu"))]
 static KERNEL_ASPACE: LazyInit<SpinNoIrq<AddrSpace>> = LazyInit::new();
 
 fn mapping_err_to_ax_err(err: MappingError) -> AxError {
@@ -80,8 +79,5 @@ pub fn init_memory_management() {
 
 /// Initializes kernel paging for secondary CPUs.
 pub fn init_memory_management_secondary() {
-    #[cfg(not(feature = "percpu"))]
     axhal::paging::set_kernel_page_table_root(kernel_page_table_root());
-    #[cfg(feature = "percpu")]
-    init_memory_management();
 }

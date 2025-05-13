@@ -106,7 +106,7 @@ fn is_init_ok() -> bool {
 /// In multi-core environment, this function is called on the primary CPU,
 /// and the secondary CPUs call [`rust_main_secondary`].
 #[cfg_attr(not(test), unsafe(no_mangle))]
-pub extern "C" fn rust_main(cpu_id: usize, dtb: usize) -> ! {
+pub extern "C" fn rust_main(cpu_id: usize) -> ! {
     ax_println!("{}", LOGO);
     ax_println!(
         "\
@@ -133,7 +133,7 @@ pub extern "C" fn rust_main(cpu_id: usize, dtb: usize) -> ! {
     axlog::init();
     axlog::set_max_level(option_env!("AX_LOG").unwrap_or("")); // no effect if set `log-level-*` features
     info!("Logging is enabled.");
-    info!("Primary CPU {} started, dtb = {:#x}.", cpu_id, dtb);
+    info!("Primary CPU {} started.", cpu_id);
 
     info!("Found physcial memory regions:");
     for r in axhal::mem::memory_regions() {
@@ -297,11 +297,11 @@ fn init_interrupt() {
     fn update_timer() {
         let now_ns = axhal::time::monotonic_time_nanos();
         // Safety: we have disabled preemption in IRQ handler.
-        let mut deadline = unsafe { NEXT_DEADLINE.read_current_raw() };
+        let mut deadline = NEXT_DEADLINE.read();
         if now_ns >= deadline {
             deadline = now_ns + PERIODIC_INTERVAL_NANOS;
         }
-        unsafe { NEXT_DEADLINE.write_current_raw(deadline + PERIODIC_INTERVAL_NANOS) };
+        NEXT_DEADLINE.write_current(deadline + PERIODIC_INTERVAL_NANOS);
         axhal::time::set_oneshot_timer(deadline);
     }
 

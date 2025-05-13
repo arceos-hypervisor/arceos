@@ -11,21 +11,23 @@ pub(crate) mod irq;
 pub(crate) mod mp;
 
 unsafe extern "C" {
-    fn rust_main(cpu_id: usize, dtb: usize);
+    fn rust_main(cpu_id: usize);
     #[cfg(feature = "smp")]
     fn rust_main_secondary(cpu_id: usize);
 }
 
 #[somehal::entry]
-fn main(cpu_id: usize, cpu_idx: usize) -> ! {
+fn main(_cpu_id: usize, cpu_idx: usize) -> ! {
+    // ArceOS soft cpu_id is cpu index.
     if cpu_idx == 0 {
-        crate::cpu::init_primary(cpu_id);
-        unsafe { rust_main(cpu_id, 0) };
+        crate::cpu::init_primary(cpu_idx);
+        unsafe { rust_main(cpu_idx) };
     } else {
-        crate::cpu::init_secondary(cpu_id);
+        crate::cpu::init_secondary(cpu_idx);
+        debug!("cpu {cpu_idx} entry");
         #[cfg(feature = "smp")]
         unsafe {
-            rust_main_secondary(cpu_id)
+            rust_main_secondary(cpu_idx)
         }
     }
 }

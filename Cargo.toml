@@ -70,3 +70,7 @@ somehal = { git = "https://github.com/rcore-os/somehal.git" }
 
 [profile.release]
 lto = true
+
+
+[patch.crates-io]
+percpu = { git = "https://github.com/ZR233/percpu" }

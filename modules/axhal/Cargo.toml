@@ -22,7 +22,6 @@ default = []
 hv = [
     "paging",
     "cortex-a",
-    "percpu/arm-el2",
     "page_table_entry/arm-el2",
     "arm_gicv2/el2",
     "dep:crate_interface",

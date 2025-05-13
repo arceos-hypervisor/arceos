@@ -23,8 +23,3 @@ pub fn dispatch_irq(irq_no: usize) {
         icc.dir(intid);
     }
 }
-
-struct Reg {
-    addr: usize,
-    size: usize,
-}

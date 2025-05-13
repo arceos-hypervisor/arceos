@@ -73,13 +73,3 @@ pub fn get_kernel_aspace_size() -> usize {
         }
     }
 }
-
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn _percpu_start_addr() -> usize {
-    percpu_all().as_ptr() as usize
-}
-
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn _percpu_end_addr() -> usize {
-    percpu_all().as_ptr_range().end as usize
-}
