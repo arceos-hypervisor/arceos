@@ -1,7 +1,7 @@
 use crate::{arch::disable_irqs, irq::IrqHandler, mem::phys_to_virt};
 use arm_gic_driver::*;
-use core::ptr::NonNull;
 use axconfig::devices::{GICC_PADDR, GICD_PADDR, GICR_PADDR, UART_IRQ};
+use core::ptr::NonNull;
 use kspin::SpinNoIrq;
 use memory_addr::PhysAddr;
 
@@ -15,7 +15,6 @@ pub const TIMER_IRQ_NUM: usize = arm_gic_driver::IntId::ppi(14).to_u32() as usiz
 #[cfg(feature = "hv")]
 /// Non-secure EL2 Physical Timer irq number.
 pub const TIMER_IRQ_NUM: usize = arm_gic_driver::IntId::ppi(10).to_u32() as usize;
-
 
 /// The UART IRQ number.
 pub const UART_IRQ_NUM: usize = arm_gic_driver::IntId::spi(UART_IRQ as u32).to_u32() as usize;
@@ -63,10 +62,18 @@ pub fn fetch_irq() -> usize {
 /// This function is called by the common interrupt handler. It looks
 /// up in the IRQ handler table and calls the corresponding handler. If
 /// necessary, it also acknowledges the interrupt controller after handling.
-pub fn dispatch_irq(_irq_no: usize) {
-    let irq_no = fetch_irq();
-    crate::irq::dispatch_irq_common(irq_no);
-    GICC.lock().as_mut().unwrap().eoi(irq_no.into());
+pub fn dispatch_irq(irq_num: usize) {
+    let intid: Option<IrqId>;
+    if irq_num == 0 {
+        intid = GICC.lock().as_mut().unwrap().ack();
+        info!("interrupt {:?}", intid.unwrap());
+    } else {
+        intid = Some(IrqId::from(irq_num));
+    }
+    if let Some(intid) = intid {
+        crate::irq::dispatch_irq_common(intid.into());
+        GICC.lock().as_mut().unwrap().eoi(intid);
+    }
 }
 
 /// Initializes GICD, GICC on the primary CPU.
@@ -90,4 +97,5 @@ pub(crate) fn init_primary() {
 pub(crate) fn init_secondary() {
     let interface = GICD.lock().as_mut().unwrap().cpu_interface();
     GICC.lock().replace(interface);
+    GICC.lock().as_mut().unwrap().setup();
 }

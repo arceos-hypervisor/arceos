@@ -58,8 +58,7 @@ riscv_goldfish = { version = "0.1", optional = true }
 aarch64-cpu = "10.0"
 tock-registers = "0.9"
 arm_gicv2 = { git = "https://github.com/arceos-hypervisor/arm_gicv2" }
-arm-gic-driver = { git = "https://github.com/buhenxihuan/arm-gic-driver.git"}
-# arm-gic-driver = { path = "../../../crates/arm-gic-driver" }
+arm-gic-driver = "0.10.2"
 crate_interface = { version = "0.1.3", optional = true }
 arm_pl011 = "0.1"
 arm_pl031 = { version = "0.2", optional = true }
