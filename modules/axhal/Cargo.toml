@@ -52,7 +52,7 @@ spin = "0.9"
 [target.'cfg(target_arch = "x86_64")'.dependencies]
 x86 = "0.52"
 x86_64 = "0.15"
-x2apic = "0.4"
+x2apic = { git = "https://github.com/arceos-hypervisor/x2apic-rs.git", branch = "manual_apic_mod_selection" }
 raw-cpuid = "11.1"
 x86_rtc = { version = "0.1", optional = true }
 x86_vcpu = { git = "https://github.com/arceos-hypervisor/x86_vcpu.git", optional = true }
