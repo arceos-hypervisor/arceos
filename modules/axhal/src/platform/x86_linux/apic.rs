@@ -6,8 +6,9 @@ use kspin::SpinNoIrq;
 use lazyinit::LazyInit;
 use memory_addr::PhysAddr;
 use x2apic::ioapic::IoApic;
-use x2apic::lapic::{LocalApic, LocalApicBuilder, xapic_base};
+use x2apic::lapic::{cpu_has_x2apic, xapic_base, LocalApic, LocalApicBuilder, LocalApicMode};
 use x86_64::instructions::port::Port;
+use x86_64::registers::model_specific::Msr;
 
 use self::vectors::*;
 use crate::mem::phys_to_virt;
@@ -84,11 +85,13 @@ pub(super) fn raw_apic_id(id_u8: u8) -> u32 {
     }
 }
 
-fn cpu_has_x2apic() -> bool {
-    match raw_cpuid::CpuId::new().get_feature_info() {
-        Some(finfo) => finfo.has_x2apic(),
-        None => false,
-    }
+fn x2apic_enabled() -> bool {
+    const XAPIC_ENABLE: u64 = 1 << 11;
+    const X2APIC_ENABLE: u64 = 1 << 10;
+    const IA32_APIC_BASE: u32 = 0x1B;
+
+    let ia32_apic_base = unsafe { Msr::new(IA32_APIC_BASE).read() };
+    ia32_apic_base & XAPIC_ENABLE != 0 && ia32_apic_base & X2APIC_ENABLE != 0
 }
 
 pub(super) fn init_primary(enabled: bool, core_id: usize) {
@@ -108,13 +111,19 @@ pub(super) fn init_primary(enabled: bool, core_id: usize) {
         .error_vector(APIC_ERROR_VECTOR as _)
         .spurious_vector(APIC_SPURIOUS_VECTOR as _);
 
-    if cpu_has_x2apic() {
+    let use_x2apic = if enabled {
+        cpu_has_x2apic()
+    } else {
+        x2apic_enabled()
+    };
+
+    if use_x2apic {
         info!("Using x2APIC.");
         unsafe { IS_X2APIC = true };
     } else {
         info!("Using xAPIC.");
         let base_vaddr = phys_to_virt(PhysAddr::from(unsafe { xapic_base() } as usize));
-        builder.set_xapic_base(base_vaddr.as_usize() as u64);
+        builder.apic_mode(LocalApicMode::XApic { xapic_base: base_vaddr.as_usize() as _ });
     }
 
     let mut lapic = builder.build().unwrap();
