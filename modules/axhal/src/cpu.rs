@@ -102,6 +102,8 @@ pub unsafe fn set_current_task_ptr<T>(ptr: *const T) {
 pub(crate) fn init_primary(cpu_id: usize) {
     #[cfg(not(plat_dyn))]
     percpu::init(axconfig::SMP);
+    #[cfg(plat_dyn)]
+    percpu::init(somehal::mem::cpu_count());
     percpu::init_percpu_reg(cpu_id);
     unsafe {
         CPU_ID.write_current_raw(cpu_id);

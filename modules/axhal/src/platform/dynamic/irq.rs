@@ -2,7 +2,8 @@ pub use crate::arch::dispatch_irq;
 pub use crate::arch::fetch_irq;
 
 use crate::irq::IrqHandler;
-use somehal::{driver::intc::*, mem::cpu_id};
+use somehal::driver::intc::*;
+use somehal::mem::cpu_idx_to_id;
 /// The maximum number of IRQs.
 pub const MAX_IRQ_COUNT: usize = 2048;
 
@@ -32,7 +33,10 @@ fn modify_chip<F: Fn(&mut Hardware)>(f: F) {
 
 /// Enables or disables the given IRQ.
 pub fn set_enable(irq: IrqConfig, enabled: bool, is_cpu_local: bool) {
-    trace!("cpu[{:?}] Irq set enable: {:?} {}", cpu_id(), irq, enabled);
+    // ArceOS cpu_id is actually cpu_idx
+    let cpu_idx = crate::cpu::this_cpu_id();
+
+    trace!("cpu[{:?}] Irq set enable: {:?} {}", cpu_idx, irq, enabled);
 
     if is_cpu_local {
         if let CPUCapability::LocalIrq(cpu) = cpu_interface().capability() {
@@ -42,8 +46,10 @@ pub fn set_enable(irq: IrqConfig, enabled: bool, is_cpu_local: bool) {
         }
     }
 
+    let cpu_hard_id = cpu_idx_to_id(cpu_idx.into());
+
     modify_chip(|c| {
-        c.set_target_cpu(irq.irq, cpu_id().raw().into()).unwrap();
+        c.set_target_cpu(irq.irq, cpu_hard_id.raw().into()).unwrap();
         c.set_trigger(irq.irq, irq.trigger).unwrap();
         if enabled {
             c.irq_enable(irq.irq).unwrap();
