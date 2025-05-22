@@ -10,6 +10,8 @@ pub use crate::platform::irq::{register_handler, set_enable};
 #[cfg(target_arch = "aarch64")]
 pub use crate::platform::irq::fetch_irq;
 
+pub use crate::platform::irq::{IPI_IRQ_NUM, send_ipi_all, send_ipi_one};
+
 /// The type if an IRQ handler.
 pub type IrqHandler = handler_table::Handler;
 

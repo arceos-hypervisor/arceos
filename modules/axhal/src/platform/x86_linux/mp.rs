@@ -107,7 +107,7 @@ pub fn shutdown_secondary_cpus() {
     for core_id in 0..axconfig::SMP {
         // DO not shutdown CPUs that are reserved for host Linux.
         if super::context::core_id_is_reserved(core_id) {
-            info!(
+            debug!(
                 "Core [{}] APIC id {:?} is reserved for Linux, skip",
                 core_id,
                 super::apic::cpu_id_to_apic_id(core_id),

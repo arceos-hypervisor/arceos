@@ -16,6 +16,7 @@ pub(super) mod vectors {
     pub const APIC_TIMER_VECTOR: u8 = 0xf0;
     pub const APIC_SPURIOUS_VECTOR: u8 = 0xf1;
     pub const APIC_ERROR_VECTOR: u8 = 0xf2;
+    pub const APIC_IPI_VECTOR: u8 = 0xf3;
 }
 
 /// The maximum number of IRQs.
@@ -23,6 +24,9 @@ pub const MAX_IRQ_COUNT: usize = 256;
 
 /// The timer IRQ number.
 pub const TIMER_IRQ_NUM: usize = APIC_TIMER_VECTOR as usize;
+
+/// The IPI IRQ number.
+pub const IPI_IRQ_NUM: usize = APIC_IPI_VECTOR as usize;
 
 const IO_APIC_BASE: PhysAddr = pa!(0xFEC0_0000);
 
@@ -58,6 +62,29 @@ pub fn set_enable(vector: usize, enabled: bool) {
 #[cfg(feature = "irq")]
 pub fn register_handler(vector: usize, handler: crate::irq::IrqHandler) -> bool {
     crate::irq::register_handler_common(vector, handler)
+}
+
+/// Sends Software Generated Interrupt (SGI)(s) (usually IPI) to the given dest CPU.
+pub fn send_ipi_one(dest_cpu_id: usize, irq_num: usize) {
+    match cpu_id_to_apic_id(dest_cpu_id) {
+        Some(apic_id) => {
+            info!("Sending IPI to CPU {dest_cpu_id} (APIC ID {apic_id})");
+            unsafe {
+                local_apic().send_ipi(irq_num as _, dest_cpu_id as _);
+            };
+        }
+        None => {
+            warn!("Failed to send IPI to CPU {dest_cpu_id}, APIC ID not found");
+        }
+    }
+}
+
+/// Sends a broadcast IPI to all CPUs.
+pub fn send_ipi_all(irq_num: usize) {
+    use x2apic::lapic::IpiAllShorthand;
+    unsafe {
+        local_apic().send_ipi_all(irq_num as _, IpiAllShorthand::AllExcludingSelf);
+    };
 }
 
 /// Dispatches the IRQ.
@@ -215,7 +242,7 @@ pub(super) fn cpu_id_speculate_apic_id(cpu_id: usize) -> u32 {
         }
     };
 
-    warn!("Speculating APIC ID for CPU {cpu_id} as {apic_id}");
+    debug!("Speculating APIC ID for CPU {cpu_id} as {apic_id}");
 
     apic_id
 }
