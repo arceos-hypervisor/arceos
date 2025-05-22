@@ -42,6 +42,8 @@ sched_cfs = ["axtask/sched_cfs", "irq"]
 # File system
 fs = ["alloc", "paging", "axdriver/virtio-blk", "dep:axfs", "axruntime/fs"] # TODO: try to remove "paging"
 myfs = ["axfs?/myfs"]
+ext4fs = ["axfs?/ext4fs"]
+fatfs = ["axfs?/fatfs"]
 
 # Networking
 net = ["alloc", "paging", "axdriver/virtio-net", "dep:axnet", "axruntime/net"]
@@ -59,6 +61,7 @@ driver-ramdisk = ["axdriver?/ramdisk", "axfs?/use-ramdisk"]
 driver-ixgbe = ["axdriver?/ixgbe"]
 driver-fxmac = ["axdriver?/fxmac"] # fxmac ethernet driver for PhytiumPi
 driver-bcm2835-sdhci = ["axdriver?/bcm2835-sdhci"]
+driver-rk3568-emmc = ["axdriver?/rk3568-emmc"] # rk3568 emmc driver
 
 #Hypervisor support 
 hv = ["axhal/hv"]

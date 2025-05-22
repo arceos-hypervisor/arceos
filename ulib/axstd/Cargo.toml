@@ -49,6 +49,8 @@ sched_cfs = ["axfeat/sched_cfs"]
 # File system
 fs = ["arceos_api/fs", "axfeat/fs"]
 myfs = ["arceos_api/myfs", "axfeat/myfs"]
+ext4fs = ["arceos_api/ext4fs", "axfeat/ext4fs"]
+fatfs = ["arceos_api/fatfs", "axfeat/fatfs"]
 
 # Networking
 net = ["arceos_api/net", "axfeat/net"]
@@ -67,6 +69,7 @@ driver-ramdisk = ["axfeat/driver-ramdisk"]
 driver-ixgbe = ["axfeat/driver-ixgbe"]
 driver-fxmac = ["axfeat/driver-fxmac"]
 driver-bcm2835-sdhci = ["axfeat/driver-bcm2835-sdhci"]
+driver-rk3568-emmc = ["axfeat/driver-rk3568-emmc"] # rk3568 emmc driver
 
 # Hypervisor support
 hv = ["axfeat/hv"]
