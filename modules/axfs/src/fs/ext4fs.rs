@@ -269,7 +269,7 @@ impl VfsNodeOps for FileWrapper {
     }
 
     fn read_at(&self, offset: u64, buf: &mut [u8]) -> VfsResult<usize> {
-        info!("To read_at {}, buf len={}", offset, buf.len());
+        trace!("To read_at {}, buf len={}", offset, buf.len());
         let mut file = self.0.lock();
         let path = file.get_path();
         let path = path.to_str().unwrap();
@@ -285,7 +285,7 @@ impl VfsNodeOps for FileWrapper {
     }
 
     fn write_at(&self, offset: u64, buf: &[u8]) -> VfsResult<usize> {
-        info!("To write_at {}, buf len={}", offset, buf.len());
+        trace!("To write_at {}, buf len={}", offset, buf.len());
         let mut file = self.0.lock();
         let path = file.get_path();
         let path = path.to_str().unwrap();
@@ -301,7 +301,7 @@ impl VfsNodeOps for FileWrapper {
     }
 
     fn truncate(&self, size: u64) -> VfsResult {
-        info!("truncate file to size={}", size);
+        trace!("truncate file to size={}", size);
         let mut file = self.0.lock();
         let path = file.get_path();
         let path = path.to_str().unwrap();
@@ -341,7 +341,7 @@ impl KernelDevOp for Disk {
     type DevType = Disk;
 
     fn read(dev: &mut Disk, mut buf: &mut [u8]) -> Result<usize, i32> {
-        debug!("READ block device buf={}", buf.len());
+        trace!("READ block device buf={}", buf.len());
         let mut read_len = 0;
         while !buf.is_empty() {
             match dev.read_one(buf) {
@@ -354,12 +354,12 @@ impl KernelDevOp for Disk {
                 Err(_e) => return Err(-1),
             }
         }
-        debug!("READ rt len={}", read_len);
+        trace!("READ rt len={}", read_len);
         Ok(read_len)
     }
 
     fn write(dev: &mut Self::DevType, mut buf: &[u8]) -> Result<usize, i32> {
-        debug!("WRITE block device buf={}", buf.len());
+        trace!("WRITE block device buf={}", buf.len());
         let mut write_len = 0;
         while !buf.is_empty() {
             match dev.write_one(buf) {
@@ -371,7 +371,7 @@ impl KernelDevOp for Disk {
                 Err(_e) => return Err(-1),
             }
         }
-        debug!("WRITE rt len={}", write_len);
+        trace!("WRITE rt len={}", write_len);
         Ok(write_len)
     }
 
@@ -381,7 +381,7 @@ impl KernelDevOp for Disk {
 
     fn seek(dev: &mut Disk, off: i64, whence: i32) -> Result<i64, i32> {
         let size = dev.size();
-        debug!(
+        trace!(
             "SEEK block device size:{}, pos:{}, offset={}, whence={}",
             size,
             &dev.position(),

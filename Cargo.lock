@@ -1484,7 +1484,7 @@ dependencies = [
 [[package]]
 name = "lwext4_rust"
 version = "0.2.0"
-source = "git+https://github.com/Josen-B/lwext4_rust.git#5024eeebbe4859538e5802f8f719fafdc69c476c"
+source = "git+https://github.com/Josen-B/lwext4_rust.git#2dc28a8c7896b3343a00de67469614fe3854327c"
 dependencies = [
  "bindgen 0.71.1",
  "log",
@@ -2085,7 +2085,7 @@ checksum = "94143f37725109f92c262ed2cf5e59bce7498c01bcc1502d7b9afe439a4e9f49"
 [[package]]
 name = "sdmmc"
 version = "0.1.0"
-source = "git+https://github.com/YanQD/sdmmc.git#f28eb176207971d074d73a346829bae7bd29da47"
+source = "git+https://github.com/YanQD/sdmmc.git#2b8c7db74cd99101cfeb69421b5132e037bd9d45"
 dependencies = [
  "aarch64-cpu 10.0.0",
  "arm_pl011",
