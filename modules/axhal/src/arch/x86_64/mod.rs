@@ -24,7 +24,15 @@ pub fn enable_irqs() {
         warn!("enable_irqs: not implemented");
     }
     #[cfg(target_os = "none")]
-    interrupts::enable()
+    {
+        cfg_if::cfg_if! {
+            if #[cfg(all(target_arch = "x86_64", platform_family = "x86-linux"))] {
+                // Do nothing, since we do not implement apic virtualization.
+            } else {
+                interrupts::enable()
+            }
+        }
+    }
 }
 
 /// Makes the current CPU to ignore interrupts.

@@ -43,16 +43,21 @@ static mut APIC_ID_IS_RESERVED: [bool; MAX_APIC_ID as usize + 1] =
 /// Enables or disables the given IRQ.
 #[cfg(feature = "irq")]
 pub fn set_enable(vector: usize, enabled: bool) {
-    // should not affect LAPIC interrupts
-    if vector < APIC_TIMER_VECTOR as _ {
-        unsafe {
-            if enabled {
-                IO_APIC.lock().enable_irq(vector as u8);
-            } else {
-                IO_APIC.lock().disable_irq(vector as u8);
-            }
-        }
-    }
+    warn!(
+        "Try to {} IRQ {}, ignore it",
+        if enabled { "enable" } else { "disable" },
+        vector
+    );
+    // // should not affect LAPIC interrupts
+    // if vector < APIC_TIMER_VECTOR as _ {
+    //     unsafe {
+    //         if enabled {
+    //             IO_APIC.lock().enable_irq(vector as u8);make
+    //         } else {
+    //             IO_APIC.lock().disable_irq(vector as u8);
+    //         }
+    //     }
+    // }
 }
 
 /// Registers an IRQ handler for the given IRQ.

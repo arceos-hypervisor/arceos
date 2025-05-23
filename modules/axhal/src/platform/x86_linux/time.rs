@@ -40,6 +40,14 @@ pub fn epochoffset_nanos() -> u64 {
 /// A timer interrupt will be triggered at the given deadline (in nanoseconds).
 #[cfg(feature = "irq")]
 pub fn set_oneshot_timer(deadline_ns: u64) {
+    use crate::cpu::this_cpu_is_reserved;
+
+    if this_cpu_is_reserved() {
+        // We don't need to set timer for CPUs that are reserved for host Linux.
+        warn!("set_oneshot_timer: this CPU is reserved for host Linux, skip it");
+        return;
+    }
+
     let lapic = super::apic::local_apic();
     let now_ns = crate::time::monotonic_time_nanos();
     unsafe {

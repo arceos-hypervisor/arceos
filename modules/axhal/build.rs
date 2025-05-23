@@ -19,6 +19,7 @@ const BUILTIN_PLATFORM_FAMILIES: &[&str] = &[
     "aarch64-rk3588j",
     "riscv64-qemu-virt",
     "x86-pc",
+    "x86-linux",
 ];
 
 fn make_cfg_values(str_list: &[&str]) -> String {
