@@ -56,6 +56,7 @@
 
 #![no_std]
 #![feature(doc_auto_cfg)]
+#![feature(used_with_arg)]
 #![feature(associated_type_defaults)]
 
 #[macro_use]
@@ -74,6 +75,9 @@ mod structs;
 
 #[cfg(feature = "virtio")]
 mod virtio;
+
+#[cfg(all(target_arch = "aarch64", feature = "rk3568-emmc"))]
+mod dyn_driver;
 
 #[cfg(feature = "ixgbe")]
 mod ixgbe;
@@ -118,6 +122,7 @@ impl AllDevices {
     }
 
     /// Probes all supported devices.
+    #[cfg(not(all(target_arch = "aarch64", feature = "dyn")))]
     fn probe(&mut self) {
         for_each_drivers!(type Driver, {
             if let Some(dev) = Driver::probe_global() {
@@ -131,6 +136,21 @@ impl AllDevices {
         });
 
         self.probe_bus_devices();
+    }
+
+    #[cfg(all(target_arch = "aarch64", feature = "dyn"))]
+    fn probe(&mut self) {
+        use alloc::boxed::Box;
+        use dyn_driver::{Block, dev_list};
+
+        #[cfg(feature = "block")]
+        {
+            let blk_devs = dev_list!(Block);
+            for dev_weak in blk_devs {
+                let dev: Block = dev_weak.into();
+                self.block.push(Box::new(dev));
+            }
+        }
     }
 
     /// Adds one device into the corresponding container, according to its device category.

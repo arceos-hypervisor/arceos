@@ -61,6 +61,7 @@ driver-ramdisk = ["axdriver?/ramdisk", "axfs?/use-ramdisk"]
 driver-ixgbe = ["axdriver?/ixgbe"]
 driver-fxmac = ["axdriver?/fxmac"] # fxmac ethernet driver for PhytiumPi
 driver-bcm2835-sdhci = ["axdriver?/bcm2835-sdhci"]
+driver-rk3568-emmc = ["axdriver?/rk3568-emmc"]
 
 #Hypervisor support 
 hv = ["axhal/hv"]

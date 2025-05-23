@@ -358,6 +358,12 @@ dependencies = [
  "cfg-if",
  "crate_interface",
  "log",
+ "rdif-base",
+ "rdif-block",
+ "rdrive",
+ "rk3568_driver_block",
+ "rk3568_driver_clk",
+ "somehal",
 ]
 
 [[package]]
@@ -676,6 +682,17 @@ dependencies = [
  "rand",
  "scheduler",
  "timer_list",
+]
+
+[[package]]
+name = "bare-test-macros"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e585a01076fee271c5aabcf36212acb349fb3e638561d842fffa8ca013f4fdd8"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.101",
 ]
 
 [[package]]
@@ -1047,6 +1064,12 @@ checksum = "10d60334b3b2e7c9d91ef8150abfb6fa4c1c39ebbcf4a81c2e346aad939fee3e"
 dependencies = [
  "thiserror",
 ]
+
+[[package]]
+name = "dma-api"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bc2af71bef611a9b47e76fb7844ab348b172aa3649ebdfdcb854a5d30cd47be5"
 
 [[package]]
 name = "dw_apb_uart"
@@ -1943,6 +1966,36 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "07aac72f95e774476db82916d79f2d303191310393830573c1ab5c821b21660a"
 
 [[package]]
+name = "rk3568_clk"
+version = "0.1.0"
+source = "git+https://github.com/YanLien/rk3568_clk.git#2120c28f91674bece2d1e1dea349919f929e7d89"
+dependencies = [
+ "log",
+ "spin 0.10.0",
+]
+
+[[package]]
+name = "rk3568_driver_block"
+version = "0.1.0"
+source = "git+https://github.com/arceos-hypervisor/rk3568_driver_crates.git#7c612023d650f80fa2f4d6fb585058bf6f868040"
+dependencies = [
+ "log",
+ "rdrive",
+ "sdmmc",
+ "somehal",
+]
+
+[[package]]
+name = "rk3568_driver_clk"
+version = "0.1.0"
+source = "git+https://github.com/arceos-hypervisor/rk3568_driver_crates.git#7c612023d650f80fa2f4d6fb585058bf6f868040"
+dependencies = [
+ "log",
+ "rk3568_clk",
+ "somehal",
+]
+
+[[package]]
 name = "rlsf"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2022,6 +2075,25 @@ name = "scopeguard"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "94143f37725109f92c262ed2cf5e59bce7498c01bcc1502d7b9afe439a4e9f49"
+
+[[package]]
+name = "sdmmc"
+version = "0.1.0"
+source = "git+https://github.com/YanQD/sdmmc.git#f28eb176207971d074d73a346829bae7bd29da47"
+dependencies = [
+ "aarch64-cpu 10.0.0",
+ "arm_pl011",
+ "bare-test-macros",
+ "bitflags 2.9.1",
+ "cfg-if",
+ "dma-api",
+ "fdt-parser",
+ "kspin",
+ "log",
+ "paste",
+ "smccc",
+ "spin 0.10.0",
+]
 
 [[package]]
 name = "semver"
