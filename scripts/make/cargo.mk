@@ -10,20 +10,9 @@ endif
 
 build_args-release := --release
 
-target_args := --target 
-
-ifeq ($(PLATFORM_IS_DYN),1)
-  target_args += $(PLATFORM_DYN_TARGET_DIR)/$(TARGET).json \
-  -Z build-std=core,alloc \
-  -Z build-std-features=compiler-builtins-mem 
-  
-else
-  target_args += $(TARGET)
-endif
-
 build_args := \
   -Z unstable-options \
-  $(target_args) \
+  --target $(TARGET) \
   --target-dir $(TARGET_DIR) \
   $(build_args-$(MODE)) \
   $(verbose)

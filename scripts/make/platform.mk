@@ -28,7 +28,7 @@ else
       $(info Using $(_arch) dyn platform)
       PLATFORM_IS_DYN := 1
       override FEATURES := $(shell echo $(FEATURES) | tr ',' ' ')
-      override FEATURES += paging
+      override FEATURES += plat-dyn
     endif
   else ifneq ($(wildcard $(PLATFORM)),)
     # custom platform, read the "arch" and "plat-name" fields from the toml file

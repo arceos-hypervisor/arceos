@@ -54,6 +54,9 @@ display = ["alloc", "paging", "axdriver/virtio-gpu", "dep:axdisplay", "axruntime
 # Real Time Clock (RTC) Driver.
 rtc = ["axhal/rtc", "axruntime/rtc"]
 
+# Dynamic platform support.
+plat-dyn = ["alloc", "paging", "axdriver?/dyn", "axhal/plat-dyn"]
+
 # Device drivers
 bus-mmio = ["axdriver?/bus-mmio"]
 bus-pci = ["axdriver?/bus-pci"]
@@ -63,7 +66,7 @@ driver-fxmac = ["axdriver?/fxmac"] # fxmac ethernet driver for PhytiumPi
 driver-bcm2835-sdhci = ["axdriver?/bcm2835-sdhci"]
 driver-rk3568-emmc = ["axdriver?/rk3568-emmc"]
 
-#Hypervisor support 
+# Hypervisor support 
 hv = ["axhal/hv"]
 
 # Logging

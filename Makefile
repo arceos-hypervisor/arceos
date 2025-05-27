@@ -103,11 +103,6 @@ else
   $(error "ARCH" must be one of "x86_64", "riscv64", "aarch64" or "loongarch64")
 endif
 
-ifeq ($(PLATFORM_IS_DYN), 1)
-  _parts := $(subst -, ,$(TARGET))
-  TARGET = $(word 1,$(_parts))-dyn-arceos-$(word 4,$(_parts))
-endif
-
 export AX_ARCH=$(ARCH)
 export AX_PLATFORM=$(PLAT_NAME)
 export AX_SMP=$(SMP)

@@ -85,16 +85,3 @@ pub fn get_kernel_aspace_size() -> usize {
         }
     }
 }
-
-#[cfg(feature = "alloc")]
-pub mod boxed {
-    use alloc::{boxed::Box, format};
-    use core::{error::Error, ptr::NonNull};
-
-    use super::iomap;
-
-    pub fn iomap_with_err(addr: PhysAddr, size: usize) -> Result<NonNull<u8>, Box<dyn Error>> {
-        iomap(addr, size).inspect_err(|e| Box::new(format!("{}", e)))?;
-        Ok(())
-    }
-}

@@ -8,7 +8,7 @@ use axplat_dyn::{
     module_driver,
 };
 
-use crate::mem::boxed::iomap_with_err;
+use crate::mem::iomap;
 
 module_driver!(
     name: "GICv2",
@@ -31,14 +31,16 @@ fn probe_gic(info: FdtInfo<'_>, _dev: &Descriptor) -> Result<HardwareKind, Box<d
     let gicd_reg = reg.next().unwrap();
     let gicc_reg = reg.next().unwrap();
 
-    let gicd = iomap_with_err(
+    let gicd = iomap(
         (gicd_reg.address as usize).into(),
         gicd_reg.size.unwrap_or(0x1000),
-    )?;
-    let gicc = iomap_with_err(
+    )
+    .map_err(|e| alloc::format!("[{}] iomap gicd failed: {}", info.node.name(), e))?;
+    let gicc = iomap(
         (gicc_reg.address as usize).into(),
         gicc_reg.size.unwrap_or(0x1000),
-    )?;
+    )
+    .map_err(|e| alloc::format!("[{}] iomap gicc failed: {}", info.node.name(), e))?;
 
     let gic = Gic::new(gicd, gicc);
 

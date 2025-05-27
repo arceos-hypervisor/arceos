@@ -26,8 +26,9 @@ hv = [
     "page_table_entry/arm-el2",
     "arm_gicv2/el2",
     "dep:crate_interface",
-    "axplat-dyn/hv",
+    "axplat-dyn?/hv",
 ]
+plat-dyn = ["alloc", "paging", "dep:axplat-dyn", "dep:rdrive"]
 
 [dependencies]
 log = "=0.4.21"
@@ -64,7 +65,8 @@ sbi-rt = { version = "0.0.3", features = ["legacy"] }
 riscv_goldfish = { version = "0.1", optional = true }
 
 [target.'cfg(target_arch = "aarch64")'.dependencies]
-somehal = { workspace = true, optional = true }
+axplat-dyn = { workspace = true, optional = true }
+rdrive = { workspace = true, optional = true }
 aarch64-cpu = "10.0"
 tock-registers = "0.9"
 arm-gic-driver = "0.11"
@@ -73,26 +75,11 @@ arm_pl011 = "0.1"
 arm_pl031 = { version = "0.2", optional = true }
 dw_apb_uart = "0.1"
 smccc = "0.2"
-
-[target.'cfg(all(target_arch = "aarch64", not(feature = "gicv3"), feature = "hv"))'.dependencies]
-arm_gicv2 = { git = "https://github.com/arceos-hypervisor/arm_gicv2", features = [
-    "el2",
-] }
-
-[target.'cfg(all(target_arch = "aarch64", not(feature = "gicv3"), not(feature = "hv")))'.dependencies]
 arm_gicv2 = { git = "https://github.com/arceos-hypervisor/arm_gicv2" }
 
 [target.'cfg(target_arch = "loongarch64")'.dependencies]
 loongArch64 = "0.2.4"
 ns16550a = "0.4.0"
-
-[target.aarch64-dyn-arceos-softfloat.dependencies]
-axplat-dyn = { workspace = true }
-rdrive = { workspace = true }
-
-[target.aarch64-dyn-arceos.dependencies]
-axplat-dyn = { workspace = true }
-rdrive = { workspace = true }
 
 
 [build-dependencies]

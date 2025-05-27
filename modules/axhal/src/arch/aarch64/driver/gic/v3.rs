@@ -2,6 +2,7 @@ use core::error::Error;
 
 extern crate alloc;
 
+use alloc::format;
 use arm_gic_driver::v3::Gic;
 use axplat_dyn::{
     driver::{Descriptor, HardwareKind, intc::Box, register::FdtInfo},
@@ -34,11 +35,13 @@ fn probe_gic(info: FdtInfo<'_>, _dev: &Descriptor) -> Result<HardwareKind, Box<d
     let gicd = iomap(
         (gicd_reg.address as usize).into(),
         gicd_reg.size.unwrap_or(0x1000),
-    )?;
+    )
+    .map_err(|e| format!("[{}] failed to map GICD: {}", info.node.name(), e))?;
     let gicr = iomap(
         (gicr_reg.address as usize).into(),
         gicr_reg.size.unwrap_or(0x1000),
-    )?;
+    )
+    .map_err(|e| format!("[{}] failed to map GICR: {}", info.node.name(), e))?;
 
     let gic = Gic::new(gicd, gicr, Default::default());
 
