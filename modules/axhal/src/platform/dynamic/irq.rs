@@ -17,6 +17,8 @@ pub(crate) unsafe fn init() {
     {
         cpu_interface().set_eoi_mode(true);
     }
+
+    crate::time::enable_irq();
 }
 
 #[cfg(feature = "smp")]
@@ -25,6 +27,8 @@ pub(crate) unsafe fn init_secondary() {
     {
         cpu_interface().set_eoi_mode(true);
     }
+
+    crate::time::enable_irq();
 }
 
 pub(crate) fn cpu_interface() -> &'static BoxCPU {

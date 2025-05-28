@@ -12,21 +12,31 @@ fn start_secondary_cpu_dyn(cpu_idx: usize, _second_cpu_idx: usize) {
     axplat_dyn::mp::cpu_on(cpu_id);
 }
 
+#[allow(unused)]
+#[repr(align(0x1000))]
+#[derive(Clone, Copy)]
+struct Stack([u8; axconfig::TASK_STACK_SIZE]);
+
+impl Stack {
+    const fn new() -> Self {
+        Stack([0; axconfig::TASK_STACK_SIZE])
+    }
+}
+
 #[cfg(not(plat_dyn))]
 fn start_secondary_cpu_static(cpu_idx: usize, second_cpu_idx: usize) {
-    use axconfig::{SMP, TASK_STACK_SIZE};
+    use axconfig::TASK_STACK_SIZE;
     use memory_addr::VirtAddr;
 
     use crate::mem::virt_to_phys;
 
-    #[allow(unused)]
-    #[unsafe(link_section = ".bss.stack")]
-    static mut SECONDARY_BOOT_STACK: [[u8; TASK_STACK_SIZE]; SMP - 1] =
-        [[0; TASK_STACK_SIZE]; SMP - 1];
+    static mut SECONDARY_BOOT_STACK: [Stack; axconfig::SMP - 1] = [Stack::new(); axconfig::SMP - 1];
 
-    let stack_top = virt_to_phys(VirtAddr::from(unsafe {
-        SECONDARY_BOOT_STACK[second_cpu_idx].as_ptr_range().end as usize
-    }));
+    let base = &raw mut SECONDARY_BOOT_STACK as usize;
+
+    let stack_top = virt_to_phys(VirtAddr::from(
+        base + (second_cpu_idx + 1) * TASK_STACK_SIZE,
+    ));
 
     crate::platform::mp::start_secondary_cpu(cpu_idx, stack_top);
 }
