@@ -91,7 +91,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest]
-        rust-toolchain: [nightly, nightly-2025-05-20]
+        rust-toolchain: [nightly, nightly-2024-12-25]
     env:
       RUSTUP_TOOLCHAIN: ${{ matrix.rust-toolchain }}
     steps:
