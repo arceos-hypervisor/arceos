@@ -1,12 +1,12 @@
 extern crate alloc;
 
 use crate::{arch::disable_irqs, irq::IrqHandler, mem::phys_to_virt};
+use alloc::boxed::Box;
 use arm_gic_driver::*;
 use axconfig::devices::{GICD_PADDR, GICR_PADDR, UART_IRQ};
 use core::ptr::NonNull;
 use kspin::SpinNoIrq;
 use memory_addr::PhysAddr;
-use alloc::boxed::Box;
 
 /// The maximum number of IRQs.
 pub const MAX_IRQ_COUNT: usize = 1024;
@@ -34,7 +34,7 @@ pub fn set_enable(irq_num: usize, enabled: bool) {
 
     let mut gicd = GICD.lock();
     let d = gicd.as_mut().unwrap();
-    
+
     if irq_num < 32 {
         trace!("GICR set enable: {} {}", irq_num, enabled);
 
@@ -104,7 +104,10 @@ pub(crate) fn init_primary() {
     debug!("Initializing GICD at {:#x}", GICD_BASE);
     gicd.open().unwrap();
 
-    debug!("Initializing GICR for BSP. Global GICR base at {:#x}", GICR_BASE);
+    debug!(
+        "Initializing GICR for BSP. Global GICR base at {:#x}",
+        GICR_BASE
+    );
     let mut interface = gicd.cpu_local().unwrap();
     interface.open().unwrap();
 
