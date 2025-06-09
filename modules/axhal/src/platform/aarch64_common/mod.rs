@@ -14,7 +14,9 @@ pub mod gicv3;
 pub use gicv3 as gic;
 
 #[cfg(all(feature = "irq", not(feature = "gicv3")))]
-pub mod gic;
+pub mod gicv2;
+#[cfg(all(feature = "irq", not(feature = "gicv3")))]
+pub use gicv2 as gic;
 
 #[cfg(not(any(
     platform_family = "aarch64-bsta1000b",
