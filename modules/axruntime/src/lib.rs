@@ -166,7 +166,7 @@ pub extern "C" fn rust_main(cpu_id: usize) -> ! {
         feature = "fs",
         feature = "net",
         feature = "display",
-        all(feature = "irq", feature = "alloc")
+        all(feature = "irq", feature = "alloc", feature = "paging")
     ))]
     {
         #[allow(unused_variables)]
