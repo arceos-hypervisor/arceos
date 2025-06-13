@@ -6,7 +6,7 @@ use alloc::boxed::Box;
 use core::error::Error;
 use core::time::Duration;
 
-use phytium_driver_block::{SdCard, IoPad, Kernel, set_impl, PAD_ADDRESS, SdCardDriver};
+use phytium_driver_block::{IoPad, Kernel, PAD_ADDRESS, SdCard, SdCardDriver, set_impl};
 
 use rdrive::{Descriptor, HardwareKind, module_driver, register::FdtInfo};
 
@@ -53,10 +53,7 @@ fn probe_sdcard(info: FdtInfo<'_>, _dev: &Descriptor) -> Result<HardwareKind, Bo
 
     let iopad = IoPad::new(iopad_reg_base);
 
-    let sdcard = SdCard::new(
-        mci_reg_base,
-        iopad,
-    );
+    let sdcard = SdCard::new(mci_reg_base, iopad);
 
     Ok(HardwareKind::Block(Box::new(SdCardDriver::new(sdcard))))
 }
