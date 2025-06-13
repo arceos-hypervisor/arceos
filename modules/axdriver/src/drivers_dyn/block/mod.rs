@@ -7,6 +7,9 @@ use rdrive::{DeviceWeak, block::*};
 #[cfg(all(target_arch = "aarch64", feature = "rk3568-emmc"))]
 mod rockchip_dwcmshc_sdhci;
 
+#[cfg(all(target_arch = "aarch64", feature = "phytium-sdcard"))]
+mod phytium_sdcard;
+
 pub struct Block(DeviceWeak<Box<dyn Interface + 'static>>);
 
 impl BaseDriverOps for Block {

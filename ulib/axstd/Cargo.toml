@@ -70,6 +70,7 @@ driver-ixgbe = ["axfeat/driver-ixgbe"]
 driver-fxmac = ["axfeat/driver-fxmac"]
 driver-bcm2835-sdhci = ["axfeat/driver-bcm2835-sdhci"]
 driver-rk3568-emmc = ["axfeat/driver-rk3568-emmc"]
+driver-phytium-sdcard = ["axfeat/driver-phytium-sdcard"]
 
 # Hypervisor support
 hv = ["axfeat/hv"]
