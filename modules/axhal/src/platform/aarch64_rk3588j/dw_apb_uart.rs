@@ -48,7 +48,7 @@ impl DW8250 {
 
     /// DW8250 initialize
     pub fn init(&mut self) {
-        const UART_SRC_CLK: u32 = 25000000;
+        const UART_SRC_CLK: u32 = 24000000;
         const BST_UART_DLF_LEN: u32 = 6;
         const BAUDRATE: u32 = 115200;
         //const BAUDRATE: u32 = 38400;

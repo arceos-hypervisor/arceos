@@ -3,21 +3,7 @@ use page_table_entry::{GenericPTE, MappingFlags, aarch64::A64PTE};
 
 /// Returns (rk3588j only) memory regions.
 pub(crate) fn default_rk3588j_regions() -> impl Iterator<Item = MemRegion> {
-    [
-        MemRegion {
-            paddr: PhysAddr::from(0x9400000),
-            size: 0xe6c00000,
-            flags: MemRegionFlags::RESERVED | MemRegionFlags::READ | MemRegionFlags::WRITE,
-            name: "reserved memory",
-        },
-        MemRegion {
-            paddr: PhysAddr::from(0x1f0000000),
-            size: 0x10000000,
-            flags: MemRegionFlags::FREE | MemRegionFlags::READ | MemRegionFlags::WRITE,
-            name: "free memory",
-        },
-    ]
-    .into_iter()
+    [].into_iter()
 }
 
 /// Returns platform-specific memory regions.
@@ -53,6 +39,11 @@ pub(crate) unsafe fn init_boot_page_table(
     boot_pt_l1[3] = A64PTE::new_page(
         PhysAddr::from(0xC000_0000),
         MappingFlags::READ | MappingFlags::WRITE | MappingFlags::DEVICE,
+        true,
+    );
+    boot_pt_l1[4] = A64PTE::new_page(
+        PhysAddr::from(0x1_0000_0000),
+        MappingFlags::READ | MappingFlags::WRITE | MappingFlags::EXECUTE,
         true,
     );
     boot_pt_l1[7] = A64PTE::new_page(

@@ -1,0 +1,54 @@
+# Architecture identifier.
+arch = "aarch64" # str
+# Platform identifier.
+platform = "aarch64-rk3588j-guest" # str
+
+#
+# Platform configs
+#
+[plat]
+# Platform family.
+family = "aarch64-rk3588j"
+
+# Base address of the whole physical memory.
+phys-memory-base = 0x1_0000_0000 # uint
+# Size of the whole physical memory.
+phys-memory-size = 0x800_0000 # uint
+# Base physical address of the kernel image.
+kernel-base-paddr = 0x1_0048_0000 # uint
+# Base virtual address of the kernel image.
+kernel-base-vaddr = "0xffff_0001_0048_0000" # uint
+# Linear mapping offset, for quick conversions between physical and virtual
+# addresses.
+phys-virt-offset = "0xffff_0000_0000_0000" # uint
+# Kernel address space base.
+kernel-aspace-base = "0xffff_0000_0000_0000" # uint
+# Kernel address space size.
+kernel-aspace-size = "0x0000_ffff_ffff_f000" # uint
+
+[devices]
+# MMIO regions with format (`base_paddr`, `size`).
+mmio-regions = [
+    ["0xfeb40000", "0x1000"], # uart8250 UART2
+    ["0xfeb50000", "0x1000"], # uart8250 UART1
+    ["0xfe600000", "0x10000"], # gic-v3 gicd
+    ["0xfe680000", "0x100000"], # gic-v3 gicr
+] # [(uint, uint)]
+
+# VirtIO MMIO regions with format (`base_paddr`, `size`).
+virtio-mmio-regions = [] # [(uint, uint)]
+
+# UART Address
+uart-paddr = "0xfeb5_0000" # uint
+uart-irq = "0x14d"         # uint
+
+# GICC Address
+gicd-paddr = "0xfe600000" # uint
+# GICR Address
+gicc-paddr = "0xfe6c0000" # uint
+gicr-paddr = "0xfe6c0000" # uint
+
+# PSCI
+psci-method = "hvc"
+
+nothing = "nothing" # str
