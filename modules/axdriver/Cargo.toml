@@ -1,48 +1,60 @@
 [package]
-name = "axdriver"
-version.workspace = true
-edition.workspace = true
 authors = ["Yuekai Jia <equation618@gmail.com>", "ChengXiang Qi <kuangjux@outlook.com>"]
 description = "ArceOS device drivers"
-license.workspace = true
-homepage.workspace = true
-repository = "https://github.com/arceos-org/arceos/tree/main/modules/axdriver"
 documentation = "https://arceos-org.github.io/arceos/axdriver/index.html"
+edition.workspace = true
+homepage.workspace = true
+license.workspace = true
+name = "axdriver"
+repository = "https://github.com/arceos-org/arceos/tree/main/modules/axdriver"
+version.workspace = true
 
 [features]
-dyn = []
+block = ["axdriver_block"]
 bus-mmio = []
 bus-pci = ["dep:axdriver_pci", "dep:axhal", "dep:axconfig"]
-net = ["axdriver_net"]
-block = ["axdriver_block"]
 display = ["axdriver_display"]
+dyn = ["dep:rdrive", "dep:arm-gic-driver", "arm-gic-driver?/rdif", "dep:axmm", "dep:rdif-intc", "dep:rdif-block", "dep:dma-api"]
+net = ["axdriver_net"]
 
 # Enabled by features `virtio-*`
 virtio = ["axdriver_virtio", "dep:axalloc", "dep:axhal", "dep:axconfig"]
 
 # various types of drivers
-virtio-blk = ["block", "virtio", "axdriver_virtio/block"]
-virtio-net = ["net", "virtio", "axdriver_virtio/net"]
-virtio-gpu = ["display", "virtio", "axdriver_virtio/gpu"]
-ramdisk = ["block", "axdriver_block/ramdisk"]
 bcm2835-sdhci = ["block", "axdriver_block/bcm2835-sdhci"]
-ixgbe = ["net", "axdriver_net/ixgbe", "dep:axalloc", "dep:axhal", "dep:axdma"]
 fxmac = ["net", "axdriver_net/fxmac", "dep:axalloc", "dep:axhal", "dep:axdma"]
+ixgbe = ["net", "axdriver_net/ixgbe", "dep:axalloc", "dep:axhal", "dep:axdma"]
+ramdisk = ["block", "axdriver_block/ramdisk"]
+virtio-blk = ["block", "virtio", "axdriver_virtio/block"]
+virtio-gpu = ["display", "virtio", "axdriver_virtio/gpu"]
+virtio-net = ["net", "virtio", "axdriver_virtio/net"]
 # more devices example: e1000 = ["net", "axdriver_net/e1000"]
 
 default = ["bus-pci"]
 
 [dependencies]
-log = "=0.4.21"
+axalloc = {workspace = true, optional = true}
+axconfig = {workspace = true, optional = true}
+axdma = {workspace = true, optional = true}
+axdriver_base = {git = "https://github.com/arceos-org/axdriver_crates.git", tag = "v0.1.2"}
+axdriver_block = {git = "https://github.com/arceos-org/axdriver_crates.git", tag = "v0.1.2", optional = true}
+axdriver_display = {git = "https://github.com/arceos-org/axdriver_crates.git", tag = "v0.1.2", optional = true}
+axdriver_net = {git = "https://github.com/arceos-org/axdriver_crates.git", tag = "v0.1.2", optional = true}
+axdriver_pci = {git = "https://github.com/arceos-org/axdriver_crates.git", tag = "v0.1.2", optional = true}
+axdriver_virtio = {git = "https://github.com/arceos-org/axdriver_crates.git", tag = "v0.1.2", optional = true}
+axerrno = "0.1"
+axhal = {workspace = true, optional = true}
+axmm = {workspace = true, optional = true}
 cfg-if = "1.0"
 crate_interface = "0.1.4"
-axdriver_base = { git = "https://github.com/arceos-org/axdriver_crates.git", tag = "v0.1.2" }
-axdriver_block = { git = "https://github.com/arceos-org/axdriver_crates.git", tag = "v0.1.2", optional = true }
-axdriver_net = { git = "https://github.com/arceos-org/axdriver_crates.git", tag = "v0.1.2", optional = true }
-axdriver_display = { git = "https://github.com/arceos-org/axdriver_crates.git", tag = "v0.1.2", optional = true }
-axdriver_pci = { git = "https://github.com/arceos-org/axdriver_crates.git", tag = "v0.1.2", optional = true }
-axdriver_virtio = { git = "https://github.com/arceos-org/axdriver_crates.git", tag = "v0.1.2", optional = true }
-axalloc = { workspace = true, optional = true }
-axhal = { workspace = true, optional = true }
-axconfig = { workspace = true, optional = true }
-axdma = { workspace = true, optional = true }
+dma-api = {version = "0.5", features = ["alloc"], optional = true}
+lazyinit = "0.2"
+log = "=0.4.21"
+memory_addr = "0.4"
+rdif-block = {version = "0.6.2", optional = true}
+rdif-intc = {version = "0.12", optional = true}
+rdrive = {version = "0.18", optional = true}
+spin = "0.10"
+
+[target.'cfg(target_arch = "aarch64")'.dependencies]
+arm-gic-driver = {version = "0.15", optional = true}
