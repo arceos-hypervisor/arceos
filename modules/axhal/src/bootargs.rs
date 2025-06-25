@@ -1,3 +1,25 @@
+//! Kernel boot arguments parsing and caching module.
+//!
+//! This module provides functionality to extract and cache kernel command line
+//! arguments from the Flattened Device Tree (FDT). It implements a caching
+//! mechanism to avoid expensive FDT parsing on repeated access.
+//!
+//! The boot arguments are typically passed from the bootloader and stored in
+//! the `/chosen/bootargs` property of the device tree. This module provides
+//! safe access to these arguments throughout the kernel's lifetime.
+//!
+//! # Usage
+//!
+//! ```rust
+//! // Initialize with FDT address during boot
+//! init_fdt(fdt_address);
+//!
+//! // Access bootargs anywhere in the kernel
+//! if let Some(args) = bootargs() {
+//!     println!("Kernel command line: {}", args);
+//! }
+//! ```
+
 use core::ptr::{self, addr_of_mut};
 use fdt_parser::Fdt;
 
