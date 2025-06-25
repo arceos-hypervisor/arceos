@@ -2,13 +2,17 @@ pub use axplat_dyn::driver;
 #[allow(unused)]
 pub use axplat_dyn::driver::intc::IrqConfig;
 
+pub use axplat_dyn::fdt_ptr;
+
 #[cfg(target_arch = "aarch64")]
 mod aarch64_timer;
 #[cfg(feature = "irq")]
 pub(crate) mod irq;
 
+use crate::bootargs::init_fdt;
+
 unsafe extern "C" {
-    fn rust_main(cpu_id: usize);
+    fn rust_main(cpu_id: usize) -> !;
     #[cfg(feature = "smp")]
     fn rust_main_secondary(cpu_id: usize);
 }
@@ -17,6 +21,7 @@ unsafe extern "C" {
 fn main(_cpu_id: usize, cpu_idx: usize) -> ! {
     // ArceOS soft cpu_id is cpu index.
     if cpu_idx == 0 {
+        init_fdt(fdt_ptr() as usize);
         crate::cpu::init_primary(cpu_idx);
         unsafe { rust_main(cpu_idx) };
     } else {

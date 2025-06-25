@@ -46,6 +46,7 @@ mod platform;
 pub mod trap;
 
 pub mod arch;
+pub mod bootargs;
 pub mod cpu;
 pub mod mem;
 pub mod time;

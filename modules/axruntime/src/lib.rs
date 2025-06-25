@@ -109,7 +109,7 @@ fn is_init_ok() -> bool {
 /// In multi-core environment, this function is called on the primary CPU,
 /// and the secondary CPUs call [`rust_main_secondary`].
 #[cfg_attr(not(test), unsafe(no_mangle))]
-pub extern "C" fn rust_main(cpu_id: usize) -> ! {
+pub extern "C" fn rust_main(cpu_id: usize, arg: usize) -> ! {
     ax_println!("{}", LOGO);
     ax_println!(
         "\
@@ -173,7 +173,15 @@ pub extern "C" fn rust_main(cpu_id: usize) -> ! {
         let all_devices = axdriver::init_drivers();
 
         #[cfg(feature = "fs")]
-        axfs::init_filesystems(all_devices.block);
+        {
+            use axfs::BootArgsFileSystem;
+            use axhal::bootargs;
+
+            let bootargs = bootargs::bootargs().unwrap_or("");
+            info!("Boot args: {}", bootargs);
+            let rootargs = BootArgsFileSystem::parse_from_bootargs(bootargs).unwrap();
+            axfs::init_filesystems(all_devices.block, rootargs);
+        }
 
         #[cfg(feature = "net")]
         axnet::init_network(all_devices.net);

@@ -28,14 +28,14 @@ impl Ext4FileSystem {
     }
 
     #[cfg(not(feature = "use-ramdisk"))]
-    pub fn new(disk: Disk) -> Self {
+    pub fn new(disk: Disk, part_offset: usize) -> Self {
         info!(
             "Got Disk size:{}, position:{}",
             disk.size(),
             disk.position()
         );
-        let inner =
-            Ext4BlockWrapper::<Disk>::new(disk).expect("failed to initialize EXT4 filesystem");
+        let inner = Ext4BlockWrapper::<Disk>::new(disk, part_offset)
+            .expect("failed to initialize EXT4 filesystem");
         let root = Arc::new(FileWrapper::new("/", InodeTypes::EXT4_DE_DIR));
         Self { inner, root }
     }

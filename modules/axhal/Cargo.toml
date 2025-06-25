@@ -50,6 +50,7 @@ axlog = { workspace = true }
 axalloc = { workspace = true, optional = true }
 cortex-a = { version = "8.1.1", optional = true }
 percpu = { workspace = true }
+fdt-parser = "0.4"
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
 x86 = "0.52"

@@ -146,13 +146,13 @@ impl VfsNodeOps for RootDirectory {
     }
 }
 
-pub(crate) fn init_rootfs(disk: crate::dev::Disk) {
+pub(crate) fn init_rootfs(disk: crate::dev::Disk, part_offset: usize) {
     cfg_if::cfg_if! {
         if #[cfg(feature = "myfs")] { // override the default filesystem
             let main_fs = fs::myfs::new_myfs(disk);
          } else if #[cfg(feature = "ext4fs")] {
             static EXT4_FS: LazyInit<Arc<fs::ext4fs::Ext4FileSystem>> = LazyInit::new();
-            EXT4_FS.init_once(Arc::new(fs::ext4fs::Ext4FileSystem::new(disk)));
+            EXT4_FS.init_once(Arc::new(fs::ext4fs::Ext4FileSystem::new(disk, part_offset)));
             let main_fs = EXT4_FS.clone();
         } else if #[cfg(feature = "fatfs")] {
             static FAT_FS: LazyInit<Arc<fs::fatfs::FatFileSystem>> = LazyInit::new();

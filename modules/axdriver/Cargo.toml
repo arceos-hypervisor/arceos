@@ -64,6 +64,6 @@ axmm = { workspace = true, optional = true }
 
 [target.'cfg(target_arch = "aarch64")'.dependencies]
 arm-gic-driver = { version = "0.13", optional = true }
-rk3568_driver_clk = { git = "https://github.com/arceos-hypervisor/rk3568_driver_crates.git", tag = "v0.1.1", optional = true }
-rk3568_driver_block = { git = "https://github.com/arceos-hypervisor/rk3568_driver_crates.git", tag = "v0.1.1", optional = true }
-phytium_driver_block = { git = "https://github.com/arceos-hypervisor/phytium_driver_crates", rev = "a8bc146", optional = true }
+rk3568_driver_clk = { git = "https://github.com/arceos-hypervisor/rk3568_driver_crates.git", branch = "dev", optional = true }
+rk3568_driver_block = { git = "https://github.com/arceos-hypervisor/rk3568_driver_crates.git", branch = "dev", optional = true }
+phytium_driver_block = { git = "https://github.com/arceos-hypervisor/phytium_driver_crates", branch = "dev", optional = true }
