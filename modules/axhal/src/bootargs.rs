@@ -1,19 +1,36 @@
 use core::ptr::{self, addr_of_mut};
 use fdt_parser::Fdt;
 
+/// Maximum size for the kernel command line arguments buffer
 const COMMAND_LINE_SIZE: usize = 2048;
 
+/// Global storage for the FDT (Flattened Device Tree) memory address
 static mut FDT_ADDR: usize = 0;
+
+/// Length of the cached bootargs string in bytes
 static mut BOOTARGS_LEN: usize = 0;
+
+/// Flag indicating whether bootargs have been parsed and cached
 static mut BOOTARGS_CACHED: bool = false;
+
+/// Static buffer to store the kernel command line arguments
 static mut BOOTARGS_BUFFER: [u8; COMMAND_LINE_SIZE] = [0; COMMAND_LINE_SIZE];
 
+/// Initialize the FDT subsystem with the device tree address
+///
+/// # Arguments
+/// * `fdt` - Physical memory address where the FDT blob is located
 pub fn init_fdt(fdt: usize) {
     unsafe {
         FDT_ADDR = fdt;
     }
 }
 
+/// Get a parsed FDT instance from the stored address
+///
+/// # Returns
+/// * `Some(Fdt)` - Successfully parsed FDT if address is valid
+/// * `None` - If FDT address is null or parsing fails
 pub fn fdt() -> Option<Fdt<'static>> {
     let fdt_addr = unsafe { FDT_ADDR };
     info!("FDT address: {:#x}", fdt_addr);
@@ -24,6 +41,15 @@ pub fn fdt() -> Option<Fdt<'static>> {
     Fdt::from_ptr(core::ptr::NonNull::new(fdt_addr as *mut _)?).ok()
 }
 
+/// Retrieve the kernel boot arguments (command line) from the device tree
+///
+/// This function implements a caching mechanism to avoid repeatedly parsing
+/// the FDT, which can be expensive. On first call, it extracts bootargs from
+/// the device tree's /chosen node and caches them in a static buffer.
+///
+/// # Returns
+/// * `Some(&str)` - The kernel command line as a UTF-8 string
+/// * `None` - If FDT is unavailable, /chosen node missing, or bootargs invalid
 pub fn bootargs() -> Option<&'static str> {
     unsafe {
         if BOOTARGS_CACHED {
@@ -37,8 +63,8 @@ pub fn bootargs() -> Option<&'static str> {
         let fdt = fdt()?;
         let chosen = fdt.chosen()?;
         let bootargs = chosen.bootargs()?;
-
         let bytes = bootargs.as_bytes();
+
         if bytes.len() > COMMAND_LINE_SIZE {
             return None;
         }
@@ -46,6 +72,7 @@ pub fn bootargs() -> Option<&'static str> {
         let buffer_ptr = addr_of_mut!(BOOTARGS_BUFFER) as *mut u8;
         ptr::copy_nonoverlapping(bytes.as_ptr(), buffer_ptr, bytes.len());
 
+        // Update cache metadata
         BOOTARGS_LEN = bytes.len();
         BOOTARGS_CACHED = true;
 
