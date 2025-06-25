@@ -11,6 +11,7 @@ use axfs::fops::{Disk, MyFileSystemIf};
 use axfs_ramfs::RamFileSystem;
 use axfs_vfs::VfsOps;
 use axio::{Result, Write};
+use partman::BootArgsFileSystem;
 
 struct MyFileSystemIfImpl;
 
@@ -46,7 +47,10 @@ fn test_ramfs() {
     println!("Testing ramfs ...");
 
     axtask::init_scheduler(); // call this to use `axsync::Mutex`.
-    axfs::init_filesystems(AxDeviceContainer::from_one(RamDisk::default())); // dummy disk, actually not used.
+    axfs::init_filesystems(
+        AxDeviceContainer::from_one(RamDisk::default()),
+        BootArgsFileSystem::default(),
+    ); // dummy disk, actually not used.
 
     if let Err(e) = create_init_files() {
         log::warn!("failed to create init files: {:?}", e);

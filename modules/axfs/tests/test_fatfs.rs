@@ -4,6 +4,7 @@ mod test_common;
 
 use axdriver::AxDeviceContainer;
 use axdriver_block::ramdisk::RamDisk;
+use partman::BootArgsFileSystem;
 
 const IMG_PATH: &str = "resources/fat16.img";
 
@@ -21,7 +22,10 @@ fn test_fatfs() {
 
     let disk = make_disk().expect("failed to load disk image");
     axtask::init_scheduler(); // call this to use `axsync::Mutex`.
-    axfs::init_filesystems(AxDeviceContainer::from_one(disk));
+    axfs::init_filesystems(
+        AxDeviceContainer::from_one(disk),
+        BootArgsFileSystem::default(),
+    );
 
     test_common::test_all();
 }

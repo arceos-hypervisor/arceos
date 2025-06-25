@@ -57,3 +57,4 @@ axdriver = { workspace = true, features = ["block", "ramdisk"] }
 axdriver_block = { git = "https://github.com/arceos-org/axdriver_crates.git", tag = "v0.1.2", features = ["ramdisk"] }
 axsync = { workspace = true, features = ["multitask"] }
 axtask = { workspace = true, features = ["test"] }
+partman = { git = "https://github.com/arceos-hypervisor/partman.git", rev = "7e9f1c5" }
