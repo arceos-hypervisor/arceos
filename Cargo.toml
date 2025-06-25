@@ -31,6 +31,10 @@ members = [
     "examples/httpserver",
     "examples/httpserver",
     "examples/shell",
+
+    "phytium/app/*",
+    "phytium/driver/*",
+
 ]
 
 [workspace.package]

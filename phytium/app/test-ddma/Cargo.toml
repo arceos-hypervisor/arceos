@@ -1,0 +1,20 @@
+[package]
+edition = "2024"
+name = "phytium-test-ddma"
+version = "0.1.0"
+
+[dependencies]
+arceos-ext = {path = "../../driver/arceos-ext"}
+axplat-aarch64-dyn = {git = "https://github.com/arceos-hypervisor/axplat-aarch64-dyn", tag = "v0.1.1", features = ["irq"]}
+axstd = {workspace = true, features = [
+  "alloc",
+  "paging",
+  "irq",
+  "page-alloc-4g",
+]}
+
+log = "0.4"
+spin = "0.10"
+
+phytium-ddma = {git = "https://github.com/drivercraft/phytium-ddma.git", tag = "v0.1.0"}
+some-serial = {git = "https://github.com/rcore-os/serial-async.git", tag = "some-serial-v0.1.1"}
