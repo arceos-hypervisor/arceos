@@ -6,6 +6,7 @@ impl AllDevices {
         // TODO: parse device tree
         #[cfg(feature = "virtio")]
         for reg in axconfig::devices::VIRTIO_MMIO_REGIONS {
+            debug!("virtio {:x} {:x}",reg.0, reg.1);
             for_each_drivers!(type Driver, {
                 if let Some(dev) = Driver::probe_mmio(reg.0, reg.1) {
                     info!(

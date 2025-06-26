@@ -149,7 +149,7 @@ impl AllDevices {
 
 /// Probes and initializes all device drivers, returns the [`AllDevices`] struct.
 pub fn init_drivers() -> AllDevices {
-    info!("Initialize device drivers...");
+    info!("666Initialize device drivers...");
     info!("  device model: {}", AllDevices::device_model());
 
     let mut all_devs = AllDevices::default();
@@ -171,6 +171,7 @@ pub fn init_drivers() -> AllDevices {
             debug!("  block device {}: {:?}", i, dev.device_name());
         }
     }
+    
     #[cfg(feature = "display")]
     {
         debug!("number of graphics devices: {}", all_devs.display.len());
