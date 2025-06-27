@@ -133,6 +133,10 @@ unsafe extern "C" fn _start() -> ! {
         // PC = 0x8_0000
         // X0 = dtb
         core::arch::naked_asm!("
+        mov x8, #97
+        mov x9, #0x09000000 //串口地址，需要变化
+        str x8, [x9]
+        
         // save DTB pointer
         mov     x20, x0             
              
