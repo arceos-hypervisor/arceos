@@ -198,14 +198,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "arm_gicv2"
-version = "0.1.0"
-source = "git+https://github.com/arceos-hypervisor/arm_gicv2#dfe5f164b94cdd07081c2fe74a0cfe4bef2852c9"
-dependencies = [
- "tock-registers 0.8.1",
-]
-
-[[package]]
 name = "arm_pl011"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -387,6 +379,7 @@ dependencies = [
  "axdriver_block",
  "axdriver_display",
  "axdriver_net",
+ "log",
  "virtio-drivers",
 ]
 
@@ -477,7 +470,6 @@ version = "0.1.0"
 dependencies = [
  "aarch64-cpu 10.0.0",
  "arm-gic-driver",
- "arm_gicv2",
  "arm_pl011",
  "arm_pl031",
  "axalloc",
