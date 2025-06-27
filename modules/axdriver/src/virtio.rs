@@ -80,24 +80,6 @@ impl<D: VirtIoDevMeta> DriverProbe for VirtIoDriver<D> {
     #[cfg(bus = "mmio")]
     fn probe_mmio(mmio_base: usize, mmio_size: usize) -> Option<AxDeviceEnum> {
         let base_vaddr = phys_to_virt(mmio_base.into());
-        // 直接读取 base_vaddr 的值
-        let header = NonNull::new(base_vaddr.as_mut_ptr()).unwrap();
-        let magic: u32 = unsafe { core::ptr::read_volatile(header.as_ptr() as *mut u32) };
-
-        error!(
-            "probe_mmio: base_vaddr={:#x}, header={:#x}, magic={:#x}",
-            base_vaddr,
-            header.as_ptr() as usize,
-            magic
-        );
-
-        let magic2: u32 = unsafe { core::ptr::read_volatile(header.as_ptr() as *mut u32) };
-
-        panic!("probe_mmio: base_vaddr={:#x}, header={:#x}, magic={:#x}",
-            base_vaddr,
-            header.as_ptr() as usize,
-            magic2
-        );
 
         if let Some((ty, transport)) =
             axdriver_virtio::probe_mmio_device(base_vaddr.as_mut_ptr(), mmio_size)

@@ -26,4 +26,9 @@ pub(crate) unsafe fn init_boot_page_table(
         MappingFlags::READ | MappingFlags::WRITE | MappingFlags::EXECUTE,
         true,
     );
+    boot_pt_l1[1] = A64PTE::new_page(
+        pa!(0x8000_0000),
+        MappingFlags::READ | MappingFlags::WRITE | MappingFlags::EXECUTE,
+        true,
+    );
 }
