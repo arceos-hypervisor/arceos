@@ -379,7 +379,6 @@ dependencies = [
  "axdriver_block",
  "axdriver_display",
  "axdriver_net",
- "log",
  "virtio-drivers",
 ]
 
