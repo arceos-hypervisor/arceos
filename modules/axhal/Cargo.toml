@@ -13,9 +13,10 @@ documentation = "https://arceos-org.github.io/arceos/axhal/index.html"
 smp = []
 alloc = []
 fp_simd = []
-paging = ["axalloc"]
+paging = ["dep:axalloc"]
 irq = []
 gicv3 = []
+virtio_console = ["dep:axalloc"]
 tls = ["alloc"]
 rtc = ["x86_rtc", "riscv_goldfish", "arm_pl031"]
 uspace = ["paging"]
@@ -41,6 +42,7 @@ axlog = { workspace = true }
 axconfig = { workspace = true }
 axalloc = { workspace = true, optional = true }
 cortex-a = { version = "8.1.1", optional = true }
+virtio-drivers = "0.7.4"
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
 x86 = "0.52"

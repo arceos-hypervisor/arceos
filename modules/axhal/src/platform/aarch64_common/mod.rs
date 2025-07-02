@@ -20,6 +20,10 @@ pub use gicv2 as gic;
 
 #[cfg(not(any(
     platform_family = "aarch64-bsta1000b",
-    platform_family = "aarch64-rk3588j"
+    platform_family = "aarch64-rk3588j",
+    // feature = "virtio_console"
 )))]
 pub mod pl011;
+
+// #[cfg(feature = "virtio_console")]
+pub mod virtio_console;
