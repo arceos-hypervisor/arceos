@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 //! PL011 UART.
 
 use arm_pl011::Pl011Uart;
@@ -52,6 +53,7 @@ pub fn read_bytes(bytes: &mut [u8]) -> usize {
 
 /// Initialize the UART
 pub fn init_early() {
+    log::info!("PL011 UART initialization complete");
     UART.lock().init();
 }
 

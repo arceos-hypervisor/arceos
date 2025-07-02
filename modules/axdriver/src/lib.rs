@@ -153,7 +153,9 @@ pub fn init_drivers() -> AllDevices {
     info!("  device model: {}", AllDevices::device_model());
 
     let mut all_devs = AllDevices::default();
+    info!("Probing devices...");
     all_devs.probe();
+    info!("Probing devices done.");
 
     #[cfg(feature = "net")]
     {
