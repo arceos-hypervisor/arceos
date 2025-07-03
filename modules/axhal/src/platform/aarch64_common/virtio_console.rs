@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 //! VirtIO Console frontend driver.
 
 use crate::mem::{phys_to_virt, virt_to_phys};

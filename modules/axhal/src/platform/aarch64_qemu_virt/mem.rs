@@ -1,5 +1,5 @@
 use crate::mem::MemRegion;
-use page_table_entry::{GenericPTE, MappingFlags, aarch64::A64PTE};
+use page_table_entry::{aarch64::A64PTE, GenericPTE, MappingFlags};
 
 /// Returns platform-specific memory regions.
 pub(crate) fn platform_regions() -> impl Iterator<Item = MemRegion> {
@@ -23,6 +23,11 @@ pub(crate) unsafe fn init_boot_page_table(
     // 0x0000_4000_0000..0x0000_8000_0000, 1G block, normal memory
     boot_pt_l1[1] = A64PTE::new_page(
         pa!(0x4000_0000),
+        MappingFlags::READ | MappingFlags::WRITE | MappingFlags::EXECUTE,
+        true,
+    );
+    boot_pt_l1[2] = A64PTE::new_page(
+        pa!(0x8000_0000),
         MappingFlags::READ | MappingFlags::WRITE | MappingFlags::EXECUTE,
         true,
     );

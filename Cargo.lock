@@ -185,16 +185,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "arm-gic-driver"
-version = "0.13.0"
-source = "git+https://github.com/rcore-os/arm-gic-driver?rev=ad1fddc194f1cf5b7602e7f35a7136f823465cb0#ad1fddc194f1cf5b7602e7f35a7136f823465cb0"
+name = "arm_gicv2"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "47d25e73c949c69f75d1b9dba39c5475523403b31eb8c2fdc99da4dc33bc1aca"
 dependencies = [
- "aarch64-cpu 10.0.0",
- "bitflags 2.9.1",
- "enum_dispatch",
- "log",
- "rdif-intc",
- "tock-registers 0.9.0",
+ "tock-registers 0.8.1",
 ]
 
 [[package]]
@@ -481,7 +477,7 @@ name = "axhal"
 version = "0.1.0"
 dependencies = [
  "aarch64-cpu 10.0.0",
- "arm-gic-driver",
+ "arm_gicv2",
  "arm_pl011",
  "arm_pl031",
  "axalloc",
@@ -490,6 +486,7 @@ dependencies = [
  "axlog",
  "bitflags 2.9.1",
  "cfg-if",
+ "cortex-a",
  "dw_apb_uart",
  "handler_table",
  "int_ratio",
@@ -509,7 +506,6 @@ dependencies = [
  "riscv_goldfish",
  "sbi-rt",
  "static_assertions",
- "tock-registers 0.9.0",
  "virtio-drivers",
  "x2apic",
  "x86",
@@ -871,6 +867,15 @@ name = "core_detect"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f8f80099a98041a3d1622845c271458a2d73e688351bf3cb999266764b81d48"
+
+[[package]]
+name = "cortex-a"
+version = "8.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8256fd5103e10027467cc7a97c9ff27fcc4547ea24864da0aff2e7aef6e18e28"
+dependencies = [
+ "tock-registers 0.8.1",
+]
 
 [[package]]
 name = "cpumask"
