@@ -51,6 +51,9 @@ display = ["alloc", "paging", "axdriver/virtio-gpu", "dep:axdisplay", "axruntime
 # Real Time Clock (RTC) Driver.
 rtc = ["axhal/rtc", "axruntime/rtc"]
 
+# VirtIO Console Driver
+virtio_console = ["alloc", "axhal/virtio_console"]
+
 # Device drivers
 bus-mmio = ["axdriver?/bus-mmio"]
 bus-pci = ["axdriver?/bus-pci"]

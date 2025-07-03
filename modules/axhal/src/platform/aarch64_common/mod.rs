@@ -4,8 +4,22 @@ pub mod generic_timer;
 #[cfg(not(platform_family = "aarch64-raspi"))]
 pub mod psci;
 
-#[cfg(feature = "irq")]
-pub mod gic;
+#[cfg(all(feature = "irq", feature = "gicv3"))]
+pub mod gicv3;
+#[cfg(all(feature = "irq", feature = "gicv3"))]
+pub use gicv3 as gic;
 
-#[cfg(not(platform_family = "aarch64-bsta1000b"))]
+#[cfg(all(feature = "irq", not(feature = "gicv3")))]
+pub mod gicv2;
+#[cfg(all(feature = "irq", not(feature = "gicv3")))]
+pub use gicv2 as gic;
+
+#[cfg(not(any(
+    platform_family = "aarch64-bsta1000b",
+    platform_family = "aarch64-rk3588j",
+    // feature = "virtio_console"
+)))]
 pub mod pl011;
+
+// #[cfg(feature = "virtio_console")]
+pub mod virtio_console;

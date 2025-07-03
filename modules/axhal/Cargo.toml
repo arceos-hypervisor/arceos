@@ -15,6 +15,9 @@ fp-simd = ["axcpu/fp-simd"]
 paging = ["axalloc", "page_table_multiarch"]
 irq = []
 tls = ["axcpu/tls"]
+alloc = []
+fp_simd = []
+gicv3 = []
 rtc = ["x86_rtc", "riscv_goldfish", "arm_pl031"]
 uspace = ["paging", "axcpu/uspace"]
 default = []
@@ -38,6 +41,8 @@ axcpu = "0.1"
 axlog = { workspace = true }
 axconfig = { workspace = true }
 axalloc = { workspace = true, optional = true }
+cortex-a = { version = "8.1.1", optional = true }
+virtio-drivers = "0.7.4"
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
 x86 = "0.52"
