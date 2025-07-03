@@ -1,3 +1,6 @@
+[patch.crates-io]
+virtio-drivers ={ path = "../crates/virtio-drivers" }
+
 [workspace]
 resolver = "2"
 
