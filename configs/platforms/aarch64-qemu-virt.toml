@@ -46,10 +46,10 @@ mmio-regions = [
 ]                                   # [(uint, uint)]
 # VirtIO MMIO regions with format (`base_paddr`, `size`).
 virtio-mmio-regions = [
-    [0x0a00_0000, 0x200],
-    [0x0a00_0200, 0x200],
+    # [0x0a00_0000, 0x200],
     # [0x0a00_0400, 0x200],
-    # [0x0a00_0600, 0x200],
+    [0x0a00_0400, 0x200],
+    [0x0a00_0600, 0x200],
     # [0x0a00_0800, 0x200],
     # [0x0a00_0a00, 0x200],
     # [0x0a00_0c00, 0x200],
