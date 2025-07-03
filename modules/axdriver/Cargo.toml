@@ -1,3 +1,7 @@
+[patch.crates-io]
+virtio-drivers = { path = "../../../crates/virtio-drivers" } 
+
+
 [package]
 name = "axdriver"
 version.workspace = true
