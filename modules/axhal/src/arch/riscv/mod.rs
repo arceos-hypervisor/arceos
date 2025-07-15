@@ -5,8 +5,7 @@ mod context;
 mod trap;
 
 use memory_addr::{PhysAddr, VirtAddr};
-use riscv::asm;
-use riscv::register::{satp, sstatus, stvec};
+use riscv::{asm, register::{satp, sstatus, stvec::{self, Stvec, TrapMode}}};
 
 #[cfg(feature = "uspace")]
 pub use self::context::UspaceContext;
@@ -85,7 +84,10 @@ pub fn flush_tlb(vaddr: Option<VirtAddr>) {
 /// Writes Supervisor Trap Vector Base Address Register (`stvec`).
 #[inline]
 pub fn set_trap_vector_base(stvec: usize) {
-    unsafe { stvec::write(stvec, stvec::TrapMode::Direct) }
+    let mut stvec = Stvec::from_bits(stvec);
+    stvec.set_trap_mode(TrapMode::Direct);
+
+    unsafe { stvec::write(stvec) }
 }
 
 /// Reads the thread pointer of the current CPU.
