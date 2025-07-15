@@ -60,14 +60,14 @@ pub fn register_handler(vector: usize, handler: crate::irq::IrqHandler) -> bool 
 }
 
 /// Sends Software Generated Interrupt (SGI)(s) (usually IPI) to the given dest CPU.
-pub fn send_sgi_one(dest_cpu_id: usize, irq_num: usize) {
+pub fn send_ipi_one(dest_cpu_id: usize, irq_num: usize) {
     unsafe {
         local_apic().send_ipi(irq_num as _, dest_cpu_id as _);
     };
 }
 
 /// Sends a broadcast IPI to all CPUs.
-pub fn send_sgi_all(irq_num: usize) {
+pub fn send_ipi_all_others(irq_num: usize) {
     use x2apic::lapic::IpiAllShorthand;
     unsafe {
         local_apic().send_ipi_all(irq_num as _, IpiAllShorthand::AllExcludingSelf);

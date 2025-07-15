@@ -406,6 +406,7 @@ impl TaskInner {
         self.ctx.get()
     }
 
+    /// Set the CPU ID where the task is running or will run.
     #[cfg(feature = "smp")]
     pub fn set_cpu_id(&self, cpu_id: u32) {
         self.cpu_id.store(cpu_id, Ordering::Release);
