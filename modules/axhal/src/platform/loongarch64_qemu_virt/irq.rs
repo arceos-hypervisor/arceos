@@ -37,3 +37,15 @@ pub fn dispatch_irq(irq_num: usize) {
     }
     crate::irq::dispatch_irq_common(irq_num)
 }
+
+/// The IPI IRQ number. An placeholder now.
+#[cfg(feature = "ipi")]
+pub const IPI_IRQ_NUM: usize = 0;
+
+/// Send an IPI to the specified CPU.
+#[cfg(feature = "ipi")]
+pub fn send_ipi_one(dest_cpu: usize, irq_num: usize) {}
+
+/// Send a broadcast IPI to all CPUs.
+#[cfg(feature = "ipi")]
+pub fn send_ipi_all_others(irq_num: usize) {}

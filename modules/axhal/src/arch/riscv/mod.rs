@@ -5,7 +5,13 @@ mod context;
 mod trap;
 
 use memory_addr::{PhysAddr, VirtAddr};
-use riscv::{asm, register::{satp, sstatus, stvec::{self, Stvec, TrapMode}}};
+use riscv::{
+    asm,
+    register::{
+        satp, sstatus,
+        stvec::{self, Stvec, TrapMode},
+    },
+};
 
 #[cfg(feature = "uspace")]
 pub use self::context::UspaceContext;

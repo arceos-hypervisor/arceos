@@ -51,12 +51,12 @@ pub fn set_enable(irq_num: usize, enabled: bool) {
 }
 
 /// Sends Software Generated Interrupt (SGI)(s) (usually IPI) to the given dest CPU.
-pub fn send_sgi_one(dest_cpu_id: usize, irq_num: usize) {
+pub fn send_ipi_one(dest_cpu_id: usize, irq_num: usize) {
     GICD.lock().send_sgi(dest_cpu_id, irq_num);
 }
 
 /// Sends a broadcast IPI to all CPUs.
-pub fn send_sgi_all(irq_num: usize) {
+pub fn send_ipi_all_others(irq_num: usize) {
     GICD.lock().send_sgi_all_except_self(irq_num);
 }
 

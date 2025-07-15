@@ -120,20 +120,20 @@ pub fn register_handler(scause: usize, handler: IrqHandler) -> bool {
 }
 
 /// Sends Software Generated Interrupt (SGI)(s) (usually IPI) to the given dest CPU.
-pub fn send_sgi_one(dest_cpu_id: usize, _irq_num: usize) {
+pub fn send_ipi_one(dest_cpu_id: usize, _irq_num: usize) {
     let res = send_ipi(HartMask::from_mask_base(1, dest_cpu_id));
     if res.is_err() {
-        warn!("send_sgi_one failed: {:?}", res);
+        warn!("send_ipi_one failed: {:?}", res);
     }
 }
 
 /// Sends a broadcast IPI to all CPUs.
-pub fn send_sgi_all(_irq_num: usize) {
+pub fn send_ipi_all_others(_irq_num: usize) {
     for i in 0..axconfig::SMP {
         if i != this_cpu_id() {
             let res = send_ipi(HartMask::from_mask_base(1, i));
             if res.is_err() {
-                warn!("send_sgi_all failed: {:?}", res);
+                warn!("send_ipi_all_others failed: {:?}", res);
                 break;
             }
         }

@@ -229,7 +229,7 @@ fn send_sgi_inner(aff3: u8, aff2: u8, aff1: u8, target: u8, vector: usize, to_al
 }
 
 /// Sends Software Generated Interrupt (SGI)(s) (usually IPI) to the given dest CPU.
-pub fn send_sgi_one(dest: usize, vector: usize) {
+pub fn send_ipi_one(dest: usize, vector: usize) {
     #[cfg(platform_family = "aarch64-rk3588j")]
     {
         // learnt from hVisor, that rockchip socs follow the 0.0.x.0 affinity scheme
@@ -246,7 +246,7 @@ pub fn send_sgi_one(dest: usize, vector: usize) {
 }
 
 /// Sends a broadcast IPI to all CPUs.
-pub fn send_sgi_all(vector: usize) {
+pub fn send_ipi_all_others(vector: usize) {
     send_sgi_inner(0, 0, 0, 0, vector, true);
 }
 
