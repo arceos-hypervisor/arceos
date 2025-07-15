@@ -275,25 +275,6 @@ pub(crate) fn init_primary() {
 
     GICD.lock().replace(gicd);
     GICR.lock().replace(interface);
-
-    // SAFETY: Set the SRE[0] bit to 1 to enable Group 1 interrupts.
-    ICC_SRE_EL2.set(0b1);
-
-    // let waker = self[current_cpu().id].WAKER.get();
-    // self[current_cpu().id].WAKER.set(waker & !GICR_WAKER_PSLEEP_BIT as u32);
-    // while (self[current_cpu().id].WAKER.get() & GICR_WAKER_CASLEEP_BIT as u32) != 0 {}
-
-    // let gicd = arm_gic_driver::v3::Gic::new(
-    //     NonNull::new(phys_to_virt(GICD_BASE).as_mut_ptr()).unwrap(),
-    //     NonNull::new(phys_to_virt(GICC_BASE).as_mut_ptr()).unwrap(),
-    //     arm_gic_driver::v3::Security::OneNS,
-    // );
-    // let interface = gicd.cpu_interface();
-
-    // GICD.lock().replace(gicd);
-    // GICC.lock().replace(interface);
-
-    // disable_irqs();
 }
 
 /// Initializes GICR on secondary CPUs.
