@@ -42,10 +42,10 @@ kspin = "0.1"
 int_ratio = "0.1.1"
 lazyinit = "0.2"
 percpu = "0.2"
-memory_addr = "0.3"
+memory_addr = "0.4"
 handler_table = "0.1"
 page_table_entry = "0.5"
-page_table_multiarch = "0.5"
+page_table_multiarch = { version = "0.5", features = ["copy-from"] }
 axlog = { workspace = true }
 axconfig = { workspace = true }
 axalloc = { workspace = true, optional = true }
@@ -60,7 +60,7 @@ raw-cpuid = "11.3"
 x86_rtc = { version = "0.1", optional = true }
 
 [target.'cfg(any(target_arch = "riscv32", target_arch = "riscv64"))'.dependencies]
-riscv = "0.12"
+riscv = "0.14"
 sbi-rt = { version = "0.0.3", features = ["legacy"] }
 riscv_plic = { version = "0.1.0" }
 riscv_goldfish = { version = "0.1", optional = true }
