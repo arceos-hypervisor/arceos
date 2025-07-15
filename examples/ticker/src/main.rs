@@ -3,9 +3,9 @@
 
 use core::time::Duration;
 
-use axstd::println;
 use axstd::os::arceos::api;
 use axstd::os::arceos::modules;
+use axstd::println;
 
 use api::time::ax_monotonic_time;
 

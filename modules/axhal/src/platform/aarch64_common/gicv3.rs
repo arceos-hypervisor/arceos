@@ -1,14 +1,14 @@
 extern crate alloc;
 
-use alloc::boxed::Box;
 use crate::{arch::disable_irqs, cpu::this_cpu_id, irq::IrqHandler, mem::phys_to_virt};
+use alloc::boxed::Box;
 use arm_gic_driver::*;
+#[cfg(feature = "hv")]
+use arm_gicv2::GicHypervisorInterface;
+use arm_gicv2::{InterruptType, translate_irq};
 use axconfig::devices::{GICD_PADDR, GICR_PADDR, UART_IRQ};
 use core::{panic, ptr::NonNull};
 use kspin::SpinNoIrq;
-use arm_gicv2::{translate_irq, InterruptType};
-#[cfg(feature = "hv")]
-use arm_gicv2::GicHypervisorInterface;
 use memory_addr::{MemoryAddr, PhysAddr};
 
 use aarch64_cpu::registers::{ICC_SRE_EL2, SCTLR_EL3::I};
@@ -218,13 +218,12 @@ fn write_lr(id: usize, val: u64) {
 }
 
 fn send_sgi_inner(aff3: u8, aff2: u8, aff1: u8, target: u8, vector: usize, to_all: bool) {
-    let value = 
-        ((vector & 0xF) << 24) |            // vector
+    let value = ((vector & 0xF) << 24) |            // vector
         (1 << target) |                     // target bitmap
         ((aff1 as usize) << 16) |           // affinity level 1
         ((aff2 as usize) << 32) |           // affinity level 2
         ((aff3 as usize) << 48) |           // affinity level 3
-        ((to_all as usize) << 40);          // interrupt routing mode
+        ((to_all as usize) << 40); // interrupt routing mode
 
     write_sysreg!(icc_sgi1r_el1, value as _);
 }
@@ -252,7 +251,7 @@ pub fn send_sgi_all(vector: usize) {
 }
 
 // dummy implementation
-pub struct MyVgic{}
+pub struct MyVgic {}
 
 /// Initializes GICD, GICC on the primary CPU.
 pub(crate) fn init_primary() {
