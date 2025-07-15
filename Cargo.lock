@@ -138,6 +138,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "arceos-ticker"
+version = "0.1.0"
+dependencies = [
+ "axstd",
+]
+
+[[package]]
 name = "arceos_api"
 version = "0.1.0"
 dependencies = [
@@ -1827,13 +1834,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.98",
-]
-
-[[package]]
-name = "ticker"
-version = "0.1.0"
-dependencies = [
- "axstd",
 ]
 
 [[package]]

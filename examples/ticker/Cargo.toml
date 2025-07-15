@@ -1,5 +1,5 @@
 [package]
-name = "ticker"
+name = "arceos-ticker"
 version = "0.1.0"
 edition.workspace = true
 authors = ["aarkegz <aarkegz@gmail.com>"]

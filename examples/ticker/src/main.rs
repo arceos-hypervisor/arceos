@@ -1,5 +1,9 @@
-#![no_std]
-#![no_main]
+#![cfg_attr(feature = "axstd", no_std)]
+#![cfg_attr(feature = "axstd", no_main)]
+
+#[cfg(feature = "axstd")]
+use axstd::println;
+
 
 use core::time::Duration;
 
@@ -9,7 +13,7 @@ use axstd::println;
 
 use api::time::ax_monotonic_time;
 
-#[unsafe(no_mangle)]
+#[cfg_attr(feature = "axstd", unsafe(no_mangle))]
 fn main() {
     println!("Ticking!");
 
