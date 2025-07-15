@@ -173,16 +173,8 @@ pub extern "C" fn rust_main(cpu_id: usize, dtb: usize) -> ! {
 
     #[cfg(feature = "irq")]
     {
-        #[cfg(any(not(target_arch = "aarch64"), not(feature = "hv")))]
-        {
-            info!("Initialize interrupt handlers...");
-            init_interrupt();
-        }
-
-        #[cfg(all(target_arch = "aarch64", feature = "hv"))]
-        {
-            info!("`init_interrupt` skipped for aarch64 hypervisor.");
-        }
+        info!("Initialize interrupt handlers...");
+        init_interrupt();
     }
 
     #[cfg(all(feature = "tls", not(feature = "multitask")))]
