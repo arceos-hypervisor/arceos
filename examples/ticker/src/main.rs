@@ -11,7 +11,7 @@ use api::time::ax_monotonic_time;
 
 #[unsafe(no_mangle)]
 fn main() {
-    println!("Hello, world!");
+    println!("Ticking!");
 
     println!("Current monotonic time: {:?}", ax_monotonic_time());
 

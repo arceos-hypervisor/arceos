@@ -1062,13 +1062,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "gicv3_tester"
-version = "0.1.0"
-dependencies = [
- "axstd",
-]
-
-[[package]]
 name = "glob"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1834,6 +1827,13 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.98",
+]
+
+[[package]]
+name = "ticker"
+version = "0.1.0"
+dependencies = [
+ "axstd",
 ]
 
 [[package]]
