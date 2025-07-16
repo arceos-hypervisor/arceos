@@ -4,7 +4,7 @@ use page_table_entry::{GenericPTE, MappingFlags, aarch64::A64PTE};
 /// Returns (a1000b only) memory regions.
 pub(crate) fn default_a1000b_regions() -> impl Iterator<Item = MemRegion> {
     [MemRegion {
-        paddr: pa!(0x80000000),
+        paddr: pa!(0x8000_0000),
         size: 0x70000000,
         flags: MemRegionFlags::RESERVED | MemRegionFlags::READ | MemRegionFlags::WRITE,
         name: "reserved memory",

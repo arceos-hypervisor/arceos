@@ -9,5 +9,5 @@ ifeq ("$(wildcard $(RK3588_MKIMG_FILE))","")
 endif
 
 kernel: check-download build
-	$(RK3588_MKIMG_FILE) --dtb rk3588-firefly-itx-3588j.dtb --img $(OUT_BIN)
+	$(RK3588_MKIMG_FILE) --dtb rk3588-firefly-itx-3588j.dtb --img $(abspath $(OUT_BIN))
 	@echo 'Built the FIT-uImage boot.img'

@@ -98,7 +98,6 @@ pub(crate) fn init_primary() {
     let mut gicd = arm_gic_driver::v3::Gic::new(
         NonNull::new(phys_to_virt(GICD_BASE).as_mut_ptr()).unwrap(),
         NonNull::new(phys_to_virt(GICR_BASE).as_mut_ptr()).unwrap(),
-        arm_gic_driver::v3::Security::OneNS,
     );
 
     debug!("Initializing GICD at {:#x}", GICD_BASE);
