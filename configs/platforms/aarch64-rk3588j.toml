@@ -73,3 +73,4 @@ psci-method = "smc"
 # };
 # RTC (PL031) Address
 # rtc-paddr = "0x901_0000"
+nothing = "nothing" # str
