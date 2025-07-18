@@ -16,6 +16,17 @@ unsafe extern "C" {
     unsafe fn __header_end();
 }
 
+fn platform_free_regions() -> impl Iterator<Item = MemRegion> {
+    axconfig::devices::MEMORY_REGIONS
+        .iter()
+        .map(|reg| MemRegion {
+            paddr: reg.0.into(),
+            size: reg.1,
+            flags: MemRegionFlags::FREE | MemRegionFlags::READ | MemRegionFlags::WRITE,
+            name: "platform free memory",
+        })
+}
+
 /// Returns the vmm free memory regions (kernel image end to physical memory end).
 fn vmm_free_regions() -> impl Iterator<Item = MemRegion> {
     let mem_pool_start = super::consts::free_memory_start();
@@ -27,12 +38,7 @@ fn vmm_free_regions() -> impl Iterator<Item = MemRegion> {
         flags: MemRegionFlags::FREE | MemRegionFlags::READ | MemRegionFlags::WRITE,
         name: "free memory",
     })
-    .chain(core::iter::once(MemRegion {
-        paddr: PhysAddr::from_usize(0x2_0000_0000), // Hard coded base address, because Linux's mem is limited to 8 GB through cmdline.
-        size: 0x2_0000_0000,                        // Hard coded 8 GB free memory region.
-        flags: MemRegionFlags::FREE | MemRegionFlags::READ | MemRegionFlags::WRITE,
-        name: "free memory",
-    }))
+    .chain(platform_free_regions())
 }
 
 fn vmm_cfg_regions() -> impl Iterator<Item = MemRegion> {
