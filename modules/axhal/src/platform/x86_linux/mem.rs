@@ -27,6 +27,12 @@ fn vmm_free_regions() -> impl Iterator<Item = MemRegion> {
         flags: MemRegionFlags::FREE | MemRegionFlags::READ | MemRegionFlags::WRITE,
         name: "free memory",
     })
+    .chain(core::iter::once(MemRegion {
+        paddr: PhysAddr::from_usize(0x2_0000_0000), // Hard coded base address, because Linux's mem is limited to 8 GB through cmdline.
+        size: 0x2_0000_0000,                        // Hard coded 8 GB free memory region.
+        flags: MemRegionFlags::FREE | MemRegionFlags::READ | MemRegionFlags::WRITE,
+        name: "free memory",
+    }))
 }
 
 fn vmm_cfg_regions() -> impl Iterator<Item = MemRegion> {

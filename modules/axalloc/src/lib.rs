@@ -91,9 +91,9 @@ impl GlobalAllocator {
 
     /// Add the given region to the allocator.
     ///
-    /// It will add the whole region to the byte allocator.
+    /// It will add the whole region to the page allocator.
     pub fn add_memory(&self, start_vaddr: usize, size: usize) -> AllocResult {
-        self.balloc.lock().add_memory(start_vaddr, size)
+        self.palloc.lock().add_memory(start_vaddr, size)
     }
 
     /// Allocate arbitrary number of bytes. Returns the left bound of the
