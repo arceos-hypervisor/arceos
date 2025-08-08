@@ -21,6 +21,7 @@ type CmdHandler = fn(&str);
 const CMD_TABLE: &[(&str, CmdHandler)] = &[
     ("cat", do_cat),
     ("cd", do_cd),
+    ("disktest", do_disktest),
     ("echo", do_echo),
     ("exit", do_exit),
     ("help", do_help),
@@ -272,6 +273,73 @@ fn do_help(_args: &str) {
 fn do_exit(_args: &str) {
     println!("Bye~");
     std::process::exit(0);
+}
+
+fn do_disktest(args: &str) {
+    let test_file = if args.is_empty() {
+        "disktest.tmp"
+    } else {
+        args.split_whitespace().next().unwrap()
+    };
+    
+    const BLOCK_SIZE: usize = 512;
+    const TEST_BLOCKS: usize = 1000; // 4MB test
+    let test_data = vec![0xAA; BLOCK_SIZE];
+    
+    println!("Disk performance test starting...");
+    println!("Test file: {}", test_file);
+    println!("Block size: {} bytes", BLOCK_SIZE);
+    println!("Total size: {} KB", (TEST_BLOCKS * BLOCK_SIZE) / 1024);
+    
+    // Write test
+    let start = std::time::Instant::now();
+    match File::create(test_file) {
+        Ok(mut file) => {
+            for _ in 0..TEST_BLOCKS {
+                if let Err(e) = file.write_all(&test_data) {
+                    print_err!("disktest", "write failed", e);
+                    return;
+                }
+            }
+        }
+        Err(e) => {
+            print_err!("disktest", test_file, e);
+            return;
+        }
+    }
+    let write_time = start.elapsed();
+    
+    // Read test
+    let start = std::time::Instant::now();
+    match File::open(test_file) {
+        Ok(mut file) => {
+            let mut buf = vec![0; BLOCK_SIZE];
+            for _ in 0..TEST_BLOCKS {
+                if let Err(e) = file.read_exact(&mut buf) {
+                    print_err!("disktest", "read failed", e);
+                    return;
+                }
+            }
+        }
+        Err(e) => {
+            print_err!("disktest", test_file, e);
+            return;
+        }
+    }
+    let read_time = start.elapsed();
+    
+    // Calculate and display results
+    let total_bytes = TEST_BLOCKS * BLOCK_SIZE;
+    let write_mbps = (total_bytes as f64) / (write_time.as_secs_f64() * 1024.0 * 1024.0);
+    let read_mbps = (total_bytes as f64) / (read_time.as_secs_f64() * 1024.0 * 1024.0);
+    
+    println!("Write: {:.2} MB/s ({:.3}s)", write_mbps, write_time.as_secs_f64());
+    println!("Read:  {:.2} MB/s ({:.3}s)", read_mbps, read_time.as_secs_f64());
+    
+    // Clean up
+    if let Err(e) = fs::remove_file(test_file) {
+        print_err!("disktest", "cleanup failed", e);
+    }
 }
 
 pub fn run_cmd(line: &[u8]) {

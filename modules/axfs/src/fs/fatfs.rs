@@ -275,7 +275,7 @@ impl Seek for Disk {
         }
         .ok_or(())?;
         if new_pos > size {
-            warn!("Seek beyond the end of the block device");
+            trace!("Seek beyond the end of the block device");
         }
         self.set_position(new_pos);
         Ok(new_pos)
