@@ -70,21 +70,36 @@ pub fn start_secondary_cpu(core_id: usize, stack_top: PhysAddr) -> bool {
 
     // This is totally hack.
     let apic_id = super::apic::cpu_id_speculate_apic_id(core_id);
-    // let apic_id = core_id;
 
     let boot_fn = || {
-        let apic_id = super::apic::raw_apic_id(apic_id as u8);
-        let lapic = super::apic::local_apic();
+        use x86::apic::x2apic::X2APIC;
+        use x86::apic::{ApicControl, ApicId};
 
         info!("Starting secondary Core [{}] APIC_ID {}", core_id, apic_id);
 
         // INIT-SIPI-SIPI Sequence
-        // Ref: Intel SDM Vol 3C, Section 8.4.4, MP Initialization Example
-        unsafe { lapic.send_init_ipi(apic_id) };
-        busy_wait(Duration::from_millis(10)); // 10ms
-        unsafe { lapic.send_sipi(START_PAGE_IDX, apic_id) };
-        busy_wait(Duration::from_micros(200)); // 200us
-        unsafe { lapic.send_sipi(START_PAGE_IDX, apic_id) };
+        // Ref:
+        // 1. Intel SDM Vol 3C, Section 10.4.4, MP Initialization Example
+        // 2. Linux source code arch/x86/kernel/smpboot.c
+
+        debug!("init with x86::apic::X2APIC");
+
+        let mut lapic = X2APIC::new();
+        let apic_id = ApicId::X2Apic(apic_id);
+        unsafe {
+            debug!("ipi_init");
+            lapic.ipi_init(apic_id);
+            busy_wait(Duration::from_micros(10)); // 10ms
+
+            // First SIPI
+            lapic.ipi_startup(apic_id, START_PAGE_IDX);
+            // Give the other CPU some time to accept the IPI.
+            busy_wait(Duration::from_millis(300)); // 300us
+            // Second SIPI
+            lapic.ipi_startup(apic_id, START_PAGE_IDX);
+            // Give the other CPU some time to accept the IPI.
+            busy_wait(Duration::from_millis(300)); // 300us
+        }
     };
 
     unsafe { setup_startup_page(stack_top, boot_fn) };
