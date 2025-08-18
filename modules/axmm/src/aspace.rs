@@ -91,7 +91,7 @@ impl AddrSpace {
                 |va| pa!(va.as_usize() - offset),
                 size,
                 flags,
-                false, // allow_huge
+                true,  // allow_huge
                 false, // flush_tlb_by_page
             )
             .map_err(paging_err_to_ax_err)?
