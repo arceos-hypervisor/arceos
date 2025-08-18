@@ -122,7 +122,7 @@ pub fn shutdown_secondary_cpus() {
     for core_id in 0..axconfig::SMP {
         // DO not shutdown CPUs that are reserved for host Linux.
         if super::context::core_id_is_reserved(core_id) {
-            debug!(
+            trace!(
                 "Core [{}] APIC id {:?} is reserved for Linux, skip",
                 core_id,
                 super::apic::cpu_id_to_apic_id(core_id),
@@ -132,7 +132,7 @@ pub fn shutdown_secondary_cpus() {
 
         match super::apic::cpu_id_to_apic_id(core_id) {
             Some(apic_id) => {
-                info!(
+                debug!(
                     "Shutting down ArceOS's secondary CPU {} APIC id {}",
                     core_id, apic_id
                 );
