@@ -34,7 +34,7 @@ pub fn start_secondary_cpus(primary_cpu_id: usize) {
 #[unsafe(no_mangle)]
 pub extern "C" fn rust_main_secondary(cpu_id: usize) -> ! {
     ENTERED_CPUS.fetch_add(1, Ordering::Relaxed);
-    info!("Secondary CPU {:x} started.", cpu_id);
+    info!("Secondary CPU [{cpu_id}] started.");
 
     #[cfg(feature = "paging")]
     axmm::init_memory_management_secondary();

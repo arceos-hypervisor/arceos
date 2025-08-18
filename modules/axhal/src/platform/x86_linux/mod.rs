@@ -67,7 +67,7 @@ fn current_cpu_id() -> usize {
 }
 
 fn vmm_primary_init_early(core_id: usize) {
-    println!("Primary CPU {} init early", core_id);
+    println!("Primary CPU [{}] init early", core_id);
     // We do not clear bss here.
     // Because currently the image was loaded by Linux.
     // crate::mem::clear_bss();
@@ -79,7 +79,7 @@ fn vmm_primary_init_early(core_id: usize) {
 fn vmm_secondary_init_early(core_id: usize) {
     #[cfg(feature = "smp")]
     {
-        println!("Secondary CPU {} init early.", core_id);
+        println!("Secondary CPU [{}] init early.", core_id);
         crate::cpu::init_secondary(core_id);
         crate::cpu::set_this_cpu_is_reserved();
     }

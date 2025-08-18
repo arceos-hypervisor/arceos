@@ -224,7 +224,7 @@ pub(super) fn cpu_id_speculate_apic_id(cpu_id: usize) -> u32 {
     let mut core_id_sum = 0;
     let mut apic_id_sum = 0;
 
-    for core_id in 0..3 {
+    for core_id in 0..axconfig::SMP {
         match cpu_id_to_apic_id(core_id) {
             Some(apic_id) => {
                 core_id_sum += core_id as u32;
