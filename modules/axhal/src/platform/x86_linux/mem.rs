@@ -16,18 +16,29 @@ unsafe extern "C" {
     unsafe fn __header_end();
 }
 
+/// Returns the free memory regions reserved by kernel cmdline
+/// (not operated by host Linux).
+/// The mapping of this memory region should be set up by ArceOS itself,
+/// so this region can not be used until `axmm::init_memory_management();` is called.
+///
+/// This region is added to glocal allocator by `init_allocator_late()`.
 fn platform_free_regions() -> impl Iterator<Item = MemRegion> {
     axconfig::devices::MEMORY_REGIONS
         .iter()
         .map(|reg| MemRegion {
             paddr: reg.0.into(),
             size: reg.1,
-            flags: MemRegionFlags::FREE | MemRegionFlags::READ | MemRegionFlags::WRITE,
+            flags: MemRegionFlags::FREE
+                | MemRegionFlags::RESERVED // Mark as reserved to avoid being used by `init_allocator()`
+                | MemRegionFlags::READ
+                | MemRegionFlags::WRITE,
             name: "platform free memory",
         })
 }
 
 /// Returns the vmm free memory regions (kernel image end to physical memory end).
+/// This memory region is used for physical memory allocation before Paging is enabled.
+/// (The mapping is set up by host Linux)
 fn vmm_free_regions() -> impl Iterator<Item = MemRegion> {
     let mem_pool_start = super::consts::free_memory_start();
     let mem_pool_end = super::consts::hv_end().align_down_4k();

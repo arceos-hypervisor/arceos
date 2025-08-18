@@ -249,7 +249,7 @@ pub fn global_init(start_vaddr: usize, size: usize) {
 /// It's similar to [`global_init`], but can be called multiple times.
 pub fn global_add_memory(start_vaddr: usize, size: usize) -> AllocResult {
     debug!(
-        "add a memory region to global allocator: [{:#x}, {:#x})",
+        "Add free physical memory region to global allocator: [{:#x}, {:#x})",
         start_vaddr,
         start_vaddr + size
     );

@@ -147,6 +147,9 @@ pub extern "C" fn rust_main(cpu_id: usize, dtb: usize) -> ! {
     #[cfg(feature = "paging")]
     axmm::init_memory_management();
 
+    #[cfg(feature = "alloc")]
+    init_allocator_late();
+
     info!("Initialize platform devices...");
     axhal::platform_init();
 
@@ -208,30 +211,44 @@ fn init_allocator() {
     info!("Initialize global memory allocator...");
     info!("  use {} allocator.", axalloc::global_allocator().name());
 
-    // The reason we choose the smallest free memory region as the base of `global_init`:
-    // `init_allocator` is called before paging is initialized, so we cannot, currently,
-    // we still use the `boot page table`, which just setup the identity mapping of the begin
-    // few GBs of physical memory, we just choose the smallest free memory region because we assume
-    // that these regions's mapping has been set up by the bootloader.
-
-    let mut min_region_size = usize::MAX;
-    let mut min_region_paddr = 0.into();
+    let mut max_region_size = 0;
+    let mut max_region_paddr = 0.into();
     for r in memory_regions() {
-        if r.flags.contains(MemRegionFlags::FREE) && r.size < min_region_size {
-            min_region_size = r.size;
-            min_region_paddr = r.paddr;
+        if r.flags.contains(MemRegionFlags::RESERVED) {
+            continue;
+        }
+        if r.flags.contains(MemRegionFlags::FREE) && r.size > max_region_size {
+            max_region_size = r.size;
+            max_region_paddr = r.paddr;
         }
     }
     for r in memory_regions() {
-        if r.flags.contains(MemRegionFlags::FREE) && r.paddr == min_region_paddr {
+        if r.flags.contains(MemRegionFlags::RESERVED) {
+            continue;
+        }
+        if r.flags.contains(MemRegionFlags::FREE) && r.paddr == max_region_paddr {
             axalloc::global_init(phys_to_virt(r.paddr).as_usize(), r.size);
             break;
         }
     }
     for r in memory_regions() {
-        if r.flags.contains(MemRegionFlags::FREE) && r.paddr != min_region_paddr {
+        if r.flags.contains(MemRegionFlags::RESERVED) {
+            continue;
+        }
+        if r.flags.contains(MemRegionFlags::FREE) && r.paddr != max_region_paddr {
             axalloc::global_add_memory(phys_to_virt(r.paddr).as_usize(), r.size)
                 .expect("add heap memory region failed");
+        }
+    }
+}
+
+#[cfg(feature = "alloc")]
+fn init_allocator_late() {
+    use axhal::mem::{MemRegionFlags, memory_regions, phys_to_virt};
+    for r in memory_regions() {
+        if r.flags.contains(MemRegionFlags::FREE) && r.flags.contains(MemRegionFlags::RESERVED) {
+            axalloc::global_add_memory(phys_to_virt(r.paddr).as_usize(), r.size)
+                .expect("add page frame memory region failed");
         }
     }
 }
