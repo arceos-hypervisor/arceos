@@ -91,14 +91,21 @@ pub fn start_secondary_cpu(core_id: usize, stack_top: PhysAddr) -> bool {
             lapic.ipi_init(apic_id);
             busy_wait(Duration::from_micros(10)); // 10ms
 
+            // According to <https://github.com/torvalds/linux/commit/1a744cb356c57303fc97eb15a298032170f841fa>.
+            // Modern processor families do not require the 10ms delay
+            // in cpu_up() to de-assert INIT. This speeds up boot
+            // and resume by 10ms per (application) processor.
+
             // First SIPI
             lapic.ipi_startup(apic_id, START_PAGE_IDX);
             // Give the other CPU some time to accept the IPI.
-            busy_wait(Duration::from_millis(300)); // 300us
+            // Linux use `udelay(10);`
+            busy_wait(Duration::from_millis(10)); // 10us
+
             // Second SIPI
             lapic.ipi_startup(apic_id, START_PAGE_IDX);
             // Give the other CPU some time to accept the IPI.
-            busy_wait(Duration::from_millis(300)); // 300us
+            busy_wait(Duration::from_millis(10)); // 10us
         }
     };
 
@@ -108,6 +115,35 @@ pub fn start_secondary_cpu(core_id: usize, stack_top: PhysAddr) -> bool {
 }
 
 static SHUTDOWN_SECONDARY_CPUS: AtomicBool = AtomicBool::new(false);
+
+pub fn shutdown_secondary_cpu(core_id: usize) {
+    // DO not reset CPUs that are reserved for host Linux.
+    if super::context::core_id_is_reserved(core_id) {
+        error!(
+            "Core [{}] APIC id {:?} is reserved for Linux, skip",
+            core_id,
+            super::apic::cpu_id_to_apic_id(core_id),
+        );
+        return;
+    }
+
+    match super::apic::cpu_id_to_apic_id(core_id) {
+        Some(apic_id) => {
+            debug!(
+                "Shutting down ArceOS's secondary CPU {} APIC id {}",
+                core_id, apic_id
+            );
+            super::apic::shutdown_ap(apic_id);
+            busy_wait(Duration::from_micros(10)); // 10ms
+        }
+        None => {
+            warn!(
+                "Shutting down ArceOS's secondary CPU {} APIC id unknown",
+                core_id
+            );
+        }
+    };
+}
 
 pub fn shutdown_secondary_cpus() {
     // Only need to shutdown secondary CPUs once.
