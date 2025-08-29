@@ -1,0 +1,18 @@
+[package]
+edition = "2024"
+name = "arceos-usb"
+version = "0.1.0"
+
+[dependencies]
+axstd = {workspace = true, features = [
+  "alloc",
+  "paging",
+  "irq",
+  # "multitask",
+]}
+arceos-ext = {workspace=true}
+spin_on = "0.1"
+spin = "0.10"
+
+# crab-usb = "0.3"
+crab-usb = {path="/home/zhourui/opensource/CrabUSB/usb-host"}

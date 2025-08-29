@@ -1,0 +1,17 @@
+[compile]
+target = "aarch64-unknown-none-softfloat"
+
+[compile.build.Custom]
+shell = ["make A=phytium/app/test-usb LD_SCRIPT=link.x FEATURES=driver-dyn LOG=trace MYPLAT=axplat-aarch64-dyn"]
+kernel = "phytium/app/test-usb/test-usb_aarch64-dyn.bin"
+
+[qemu]
+machine = "virt"
+cpu = "cortex-a57"
+graphic = false
+args = ""
+
+[uboot]
+serial = "/dev/ttyUSB0"
+baud_rate = 115200
+dtb_file = "phytium/phytium.dtb"
