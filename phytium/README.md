@@ -79,3 +79,5 @@ wait for `<INTERRUPT>`
 ```
 
 put board power on or reset.
+
+next run use `ostool run uboot`, edit `.project.toml` to change configuration. app has some example `project.toml` files.
