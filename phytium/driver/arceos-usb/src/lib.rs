@@ -4,8 +4,8 @@ extern crate alloc;
 
 use alloc::{boxed::Box, vec::Vec};
 use arceos_ext::iomap;
-use axstd::os::arceos::modules::{axhal::{self, irq::register}, axlog::info};
-use core::{ptr::NonNull, time::Duration};
+use axstd::os::arceos::modules::axhal::{self, irq::register};
+use core::time::Duration;
 use crab_usb::err::USBError;
 use spin::{Mutex, Once};
 
@@ -52,7 +52,6 @@ pub fn usb() -> &'static Mutex<USBHost> {
 }
 
 fn irq_handler() {
-    info!("USB IRQ");
     USB_IRQ_HANDLE.wait().handle_event();
 }
 

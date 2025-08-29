@@ -10,11 +10,14 @@ extern crate log;
 
 #[unsafe(no_mangle)]
 fn main() {
+    println!("Test USB start...");
+
     let ls = arceos_usb::dev_list().unwrap();
-    println!("USB Device List {}:", ls.len());
+
+    info!("USB Device List {}:", ls.len());
     for dev in ls {
-        println!("  {dev}");
+        info!("  {dev}");
     }
 
-    println!("Test USB done");
+    info!("Test USB done");
 }

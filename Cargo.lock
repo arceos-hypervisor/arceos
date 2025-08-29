@@ -765,6 +765,7 @@ dependencies = [
 [[package]]
 name = "axplat-aarch64-dyn"
 version = "0.1.1"
+source = "git+https://github.com/arceos-hypervisor/axplat-aarch64-dyn?tag=v0.1.1#27f55d64029daf50de12f57acd3bda2a8dab2f33"
 dependencies = [
  "aarch64-cpu 10.0.0",
  "aarch64-cpu-ext",
@@ -1355,7 +1356,9 @@ dependencies = [
 
 [[package]]
 name = "crab-usb"
-version = "0.3.5"
+version = "0.3.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b4bee83a5959c71b68ec9eac1dc30aa5872d8ef4f85097825e0225d9d610b3ce"
 dependencies = [
  "bare-test-macros",
  "bitflags 2.9.3",
@@ -4360,6 +4363,8 @@ dependencies = [
 [[package]]
 name = "usb-if"
 version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7e65d6eb0234039a404fb41e610b2e70a7872d499449ab1fe175ed001a686715"
 dependencies = [
  "futures",
  "log",
