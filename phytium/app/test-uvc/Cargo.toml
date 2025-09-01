@@ -1,0 +1,22 @@
+[package]
+edition = "2024"
+name = "phytium-test-uvc"
+version = "0.1.0"
+
+[dependencies]
+arceos-ext = {workspace=true}
+axplat-aarch64-dyn = {workspace=true, features = ["irq"]}
+axstd = {workspace = true, features = [
+  "alloc",
+  "paging",
+  "irq",
+  "page-alloc-4g",
+]}
+
+log = "0.4"
+spin = "0.10"
+spin_on = "0.1"
+
+arceos-usb = {path = "../../driver/arceos-usb"}
+# crab-uvc = {path="/home/zhourui/opensource/CrabUSB/usb-device/uvc"}
+crab-uvc = {git = "https://github.com/drivercraft/CrabUSB.git", tag = "crab-usb-v0.3.8"}
