@@ -2954,6 +2954,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "phytium-uvc-yolo"
+version = "0.1.0"
+dependencies = [
+ "arceos-ext",
+ "arceos-usb",
+ "axplat-aarch64-dyn 0.1.1 (git+https://github.com/arceos-hypervisor/axplat-aarch64-dyn?tag=v0.1.1)",
+ "axstd",
+ "crab-uvc",
+ "log",
+ "spin 0.10.0",
+ "spin_on",
+]
+
+[[package]]
 name = "pie-boot-if"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
