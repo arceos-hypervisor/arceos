@@ -1,26 +1,26 @@
 [package]
-name = "axalloc"
-version.workspace = true
-edition.workspace = true
 authors = ["Yuekai Jia <equation618@gmail.com>"]
 description = "ArceOS global memory allocator"
-license.workspace = true
-homepage.workspace = true
-repository = "https://github.com/arceos-org/arceos/tree/main/modules/axalloc"
 documentation = "https://arceos-org.github.io/arceos/axalloc/index.html"
+edition.workspace = true
+homepage.workspace = true
+license.workspace = true
+name = "axalloc"
+repository = "https://github.com/arceos-org/arceos/tree/main/modules/axalloc"
+version.workspace = true
 
 [features]
-default = ["tlsf", "allocator/page-alloc-256m"]
-tlsf = ["allocator/tlsf"]
-slab = ["allocator/slab"]
 buddy = ["allocator/buddy"]
-page-alloc-64g = ["allocator/page-alloc-64g"] # Support up to 64G memory capacity
+default = ["tlsf", "allocator/page-alloc-256m"]
 page-alloc-4g = ["allocator/page-alloc-4g"] # Support up to 4G memory capacity
+page-alloc-64g = ["allocator/page-alloc-64g"] # Support up to 64G memory capacity
+slab = ["allocator/slab"]
+tlsf = ["allocator/tlsf"]
 
 [dependencies]
-log = "=0.4.21"
+allocator = {git = "https://github.com/arceos-org/allocator.git", tag = "v0.1.1", features = ["bitmap"]}
+axerrno = "0.1"
 cfg-if = "1.0"
 kspin = "0.1"
+log = {workspace = true}
 memory_addr = "0.4"
-axerrno = "0.1"
-allocator = { git = "https://github.com/arceos-org/allocator.git", tag ="v0.1.1", features = ["bitmap"] }

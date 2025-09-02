@@ -13,6 +13,8 @@ extern crate axstd as std;
 #[macro_use]
 extern crate log;
 
+mod model;
+
 #[unsafe(no_mangle)]
 fn main() {
     spin_on::spin_on(async {
