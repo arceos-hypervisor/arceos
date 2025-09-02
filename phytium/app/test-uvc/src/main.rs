@@ -105,7 +105,7 @@ fn main() {
                             }
 
                             // 将数据按4KB块分割输出，使用十六进制编码
-                            const CHUNK_SIZE: usize = 4096;
+                            const CHUNK_SIZE: usize = 4096 * 4;
                             let chunks = frame.data.chunks(CHUNK_SIZE);
                             let total_chunks = chunks.len();
 
@@ -113,7 +113,7 @@ fn main() {
                                 // 将每个字节转换为十六进制字符串
                                 let hex_data = chunk
                                     .iter()
-                                    .map(|b| format!("{:02x}", b))
+                                    .map(|b| format!("{b:02x}"))
                                     .collect::<Vec<_>>()
                                     .join("");
 

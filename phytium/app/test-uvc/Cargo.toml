@@ -19,4 +19,4 @@ spin_on = "0.1"
 
 arceos-usb = {path = "../../driver/arceos-usb"}
 # crab-uvc = {path="/home/zhourui/opensource/CrabUSB/usb-device/uvc"}
-crab-uvc = {git = "https://github.com/drivercraft/CrabUSB.git", tag = "crab-usb-v0.3.8"}
+crab-uvc = {git = "https://github.com/drivercraft/CrabUSB.git", tag = "crab-usb-v0.3.9"}

@@ -218,7 +218,7 @@ version = "0.1.0"
 dependencies = [
  "arceos-ext",
  "axstd",
- "crab-usb",
+ "crab-usb 0.3.9",
  "spin 0.10.0",
  "spin_on",
 ]
@@ -1373,7 +1373,30 @@ dependencies = [
  "thiserror 2.0.16",
  "tock-registers 0.10.0",
  "trait-ffi",
- "usb-if",
+ "usb-if 0.3.2 (git+https://github.com/drivercraft/CrabUSB.git?tag=crab-usb-v0.3.8)",
+ "xhci",
+]
+
+[[package]]
+name = "crab-usb"
+version = "0.3.9"
+source = "git+https://github.com/drivercraft/CrabUSB.git?tag=crab-usb-v0.3.9#1e091f800f95865d7461bfcf1bd9ca3de0679b0c"
+dependencies = [
+ "bare-test-macros",
+ "bitflags 2.9.3",
+ "crossbeam",
+ "crossbeam-skiplist",
+ "dma-api",
+ "futures",
+ "log",
+ "mbarrier",
+ "nb",
+ "num_enum",
+ "spin 0.10.0",
+ "thiserror 2.0.16",
+ "tock-registers 0.10.0",
+ "trait-ffi",
+ "usb-if 0.3.2 (git+https://github.com/drivercraft/CrabUSB.git?tag=crab-usb-v0.3.9)",
  "xhci",
 ]
 
@@ -1382,9 +1405,19 @@ name = "crab-uvc"
 version = "0.1.0"
 source = "git+https://github.com/drivercraft/CrabUSB.git?tag=crab-usb-v0.3.8#fcbc58061c547d54ed23b35ee68b56eba4bf7a29"
 dependencies = [
- "crab-usb",
+ "crab-usb 0.3.8",
  "log",
- "usb-if",
+ "usb-if 0.3.2 (git+https://github.com/drivercraft/CrabUSB.git?tag=crab-usb-v0.3.8)",
+]
+
+[[package]]
+name = "crab-uvc"
+version = "0.1.0"
+source = "git+https://github.com/drivercraft/CrabUSB.git?tag=crab-usb-v0.3.9#1e091f800f95865d7461bfcf1bd9ca3de0679b0c"
+dependencies = [
+ "crab-usb 0.3.9",
+ "log",
+ "usb-if 0.3.2 (git+https://github.com/drivercraft/CrabUSB.git?tag=crab-usb-v0.3.9)",
 ]
 
 [[package]]
@@ -2947,21 +2980,21 @@ dependencies = [
  "arceos-usb",
  "axplat-aarch64-dyn 0.1.1 (git+https://github.com/arceos-hypervisor/axplat-aarch64-dyn?tag=v0.1.1)",
  "axstd",
- "crab-uvc",
+ "crab-uvc 0.1.0 (git+https://github.com/drivercraft/CrabUSB.git?tag=crab-usb-v0.3.9)",
  "log",
  "spin 0.10.0",
  "spin_on",
 ]
 
 [[package]]
-name = "phytium-uvc-yolo"
+name = "phytium-uvc-detect"
 version = "0.1.0"
 dependencies = [
  "arceos-ext",
  "arceos-usb",
  "axplat-aarch64-dyn 0.1.1 (git+https://github.com/arceos-hypervisor/axplat-aarch64-dyn?tag=v0.1.1)",
  "axstd",
- "crab-uvc",
+ "crab-uvc 0.1.0 (git+https://github.com/drivercraft/CrabUSB.git?tag=crab-usb-v0.3.8)",
  "log",
  "spin 0.10.0",
  "spin_on",
@@ -4401,6 +4434,18 @@ dependencies = [
 name = "usb-if"
 version = "0.3.2"
 source = "git+https://github.com/drivercraft/CrabUSB.git?tag=crab-usb-v0.3.8#fcbc58061c547d54ed23b35ee68b56eba4bf7a29"
+dependencies = [
+ "futures",
+ "log",
+ "num_enum",
+ "spin 0.10.0",
+ "thiserror 2.0.16",
+]
+
+[[package]]
+name = "usb-if"
+version = "0.3.2"
+source = "git+https://github.com/drivercraft/CrabUSB.git?tag=crab-usb-v0.3.9#1e091f800f95865d7461bfcf1bd9ca3de0679b0c"
 dependencies = [
  "futures",
  "log",

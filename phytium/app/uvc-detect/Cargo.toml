@@ -1,6 +1,6 @@
 [package]
 edition = "2024"
-name = "phytium-uvc-yolo"
+name = "phytium-uvc-detect"
 version = "0.1.0"
 
 [dependencies]

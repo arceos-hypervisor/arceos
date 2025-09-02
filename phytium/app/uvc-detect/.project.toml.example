@@ -2,8 +2,8 @@
 target = "aarch64-unknown-none-softfloat"
 
 [compile.build.Custom]
-shell = ["make A=phytium/app/test-uvc LD_SCRIPT=link.x FEATURES=driver-dyn LOG=trace MYPLAT=axplat-aarch64-dyn"]
-kernel = "phytium/app/test-uvc/test-uvc_aarch64-dyn.bin"
+shell = ["make A=phytium/app/uvc-detect LD_SCRIPT=link.x FEATURES=driver-dyn LOG=info MYPLAT=axplat-aarch64-dyn"]
+kernel = "phytium/app/uvc-detect/uvc-detect_aarch64-dyn.bin"
 
 [qemu]
 machine = "virt"
@@ -15,3 +15,6 @@ args = ""
 serial = "/dev/ttyUSB0"
 baud_rate = 115200
 dtb_file = "phytium/phytium.dtb"
+
+[uboot.net]
+interface = "enp3s0"
