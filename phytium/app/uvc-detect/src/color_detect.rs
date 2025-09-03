@@ -6,6 +6,7 @@
 //! - 主要颜色检测
 //! - 颜色名称识别
 
+use mjpeg_decoder::{ColorAnalyzer, MjpegDecoder};
 use std::string::{String, ToString};
 use std::vec::Vec;
 
@@ -41,12 +42,52 @@ pub struct ColorDetectionResult {
     pub sampled_pixels: usize,
 }
 
+/// 颜色变化事件
+#[derive(Debug)]
+pub struct ColorChangeEvent {
+    /// 帧号
+    pub frame_number: u64,
+    /// 新的主题色
+    pub new_color: String,
+    /// 平均颜色
+    pub average_color: RgbColor,
+    /// 亮度等级
+    pub brightness_level: String,
+    /// 当前FPS
+    pub current_fps: f32,
+    /// 总帧数
+    pub total_frames: u64,
+}
+
+/// 检测统计信息
+#[derive(Debug)]
+pub struct DetectionStatistics {
+    /// 总帧数
+    pub total_frames: u64,
+    /// 当前FPS
+    pub current_fps: f32,
+    /// 运行时间（秒）
+    pub elapsed_time: f32,
+    /// 当前主题色
+    pub current_dominant_color: Option<String>,
+}
+
 /// 颜色检测器
 pub struct ColorDetector {
     /// 采样间隔，用于降低计算复杂度
     pub sample_interval: usize,
     /// 检测器类型，用于处理不同的视频格式
     pub detector_type: DetectorType,
+    /// MJPEG解码器
+    mjpeg_decoder: MjpegDecoder,
+    /// 颜色分析器
+    color_analyzer: ColorAnalyzer,
+    /// 当前主题色
+    current_dominant_color: Option<String>,
+    /// 帧计数器
+    frame_count: u64,
+    /// 开始时间
+    start_time: Option<std::time::Instant>,
 }
 
 /// 检测器类型，针对不同的视频格式
@@ -69,6 +110,11 @@ impl Default for ColorDetector {
         Self {
             sample_interval: 8, // 每8个像素采样一次
             detector_type: DetectorType::Mjpeg,
+            mjpeg_decoder: MjpegDecoder::new(),
+            color_analyzer: ColorAnalyzer::new(),
+            current_dominant_color: None,
+            frame_count: 0,
+            start_time: None,
         }
     }
 }
@@ -78,6 +124,11 @@ impl ColorDetector {
         Self {
             sample_interval,
             detector_type: DetectorType::Mjpeg,
+            mjpeg_decoder: MjpegDecoder::new(),
+            color_analyzer: ColorAnalyzer::new(),
+            current_dominant_color: None,
+            frame_count: 0,
+            start_time: None,
         }
     }
 
@@ -86,20 +137,105 @@ impl ColorDetector {
         Self {
             sample_interval,
             detector_type,
+            mjpeg_decoder: MjpegDecoder::new(),
+            color_analyzer: ColorAnalyzer::new(),
+            current_dominant_color: None,
+            frame_count: 0,
+            start_time: None,
         }
     }
 
     /// 从视频帧数据中检测颜色，根据检测器类型选择相应的处理方法
     pub fn detect_color_from_frame(
-        &self,
+        &mut self,
         frame_data: &[u8],
     ) -> Result<ColorDetectionResult, String> {
         match &self.detector_type {
             DetectorType::Mjpeg => self.detect_color_from_mjpeg(frame_data),
-            DetectorType::Yuyv => self.detect_color_from_yuyv(frame_data),
-            DetectorType::Rgb24 => self.detect_color_from_rgb24(frame_data),
-            DetectorType::Rgb32 => self.detect_color_from_rgb32(frame_data),
-            DetectorType::Generic => self.detect_color_from_generic(frame_data),
+            _ => panic!("Only MJPEG detection is implemented in this version."),
+        }
+    }
+
+    /// 检测颜色变化并更新统计信息
+    pub fn detect_and_track_color_change(
+        &mut self,
+        frame_data: &[u8],
+        frame_number: u64,
+    ) -> Result<Option<ColorChangeEvent>, String> {
+        // 初始化开始时间
+        if self.start_time.is_none() {
+            self.start_time = Some(std::time::Instant::now());
+        }
+
+        // 更新帧计数
+        self.frame_count += 1;
+
+        // 检测颜色
+        let result = self.detect_color_from_frame(frame_data)?;
+
+        // 检查主题色是否发生变化
+        let color_changed = match &self.current_dominant_color {
+            None => {
+                // 第一次检测到颜色
+                self.current_dominant_color = Some(result.dominant_color_name.clone());
+                true
+            }
+            Some(current_color) => {
+                if current_color != &result.dominant_color_name {
+                    // 颜色发生变化
+                    self.current_dominant_color = Some(result.dominant_color_name.clone());
+                    true
+                } else {
+                    false
+                }
+            }
+        };
+
+        if color_changed {
+            // 计算FPS
+            let fps = self.calculate_current_fps();
+
+            Ok(Some(ColorChangeEvent {
+                frame_number,
+                new_color: result.dominant_color_name.clone(),
+                average_color: result.average_color,
+                brightness_level: result.brightness_level.clone(),
+                current_fps: fps,
+                total_frames: self.frame_count,
+            }))
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// 计算当前FPS
+    pub fn calculate_current_fps(&self) -> f32 {
+        if let Some(start_time) = self.start_time {
+            let elapsed = start_time.elapsed().as_secs_f32();
+            if elapsed > 0.0 {
+                self.frame_count as f32 / elapsed
+            } else {
+                0.0
+            }
+        } else {
+            0.0
+        }
+    }
+
+    /// 获取统计信息
+    pub fn get_statistics(&self) -> DetectionStatistics {
+        let fps = self.calculate_current_fps();
+        let elapsed = if let Some(start_time) = self.start_time {
+            start_time.elapsed().as_secs_f32()
+        } else {
+            0.0
+        };
+
+        DetectionStatistics {
+            total_frames: self.frame_count,
+            current_fps: fps,
+            elapsed_time: elapsed,
+            current_dominant_color: self.current_dominant_color.clone(),
         }
     }
 
@@ -238,74 +374,40 @@ impl ColorDetector {
 
     /// 从MJPEG帧数据中检测颜色
     pub fn detect_color_from_mjpeg(
-        &self,
+        &mut self,
         mjpeg_data: &[u8],
     ) -> Result<ColorDetectionResult, String> {
-        // 尝试从MJPEG数据中提取RGB像素
-        let rgb_data = self.decode_mjpeg_simple(mjpeg_data)?;
+        // 使用我们的专业MJPEG解码器
+        let rgba_pixels = self
+            .mjpeg_decoder
+            .decode_to_rgba(mjpeg_data)
+            .map_err(|e| format!("MJPEG解码失败: {:?}", e))?;
 
-        // 计算颜色统计信息
-        self.analyze_rgb_data(&rgb_data)
-    }
+        // 使用采样间隔减少计算量
+        let sampled_pixels: Vec<_> = rgba_pixels
+            .iter()
+            .step_by(self.sample_interval)
+            .cloned()
+            .collect();
 
-    /// 简单的MJPEG解码器（仅适用于基本的JPEG格式）
-    /// 注意：这是一个简化版本，实际项目中应该使用专业的JPEG解码库
-    fn decode_mjpeg_simple(&self, mjpeg_data: &[u8]) -> Result<Vec<RgbColor>, String> {
-        // 查找JPEG标记
-        if mjpeg_data.len() < 10 {
-            return Err("MJPEG数据太短".to_string());
-        }
+        // 使用专业的颜色分析器
+        let analysis_result = self.color_analyzer.analyze_rgba_colors(&sampled_pixels);
 
-        // 检查JPEG魔数 (0xFF 0xD8)
-        if mjpeg_data[0] != 0xFF || mjpeg_data[1] != 0xD8 {
-            return Err("不是有效的JPEG格式".to_string());
-        }
+        // 转换为我们的结果格式
+        let average_color = RgbColor::new(
+            analysis_result.average_color.r,
+            analysis_result.average_color.g,
+            analysis_result.average_color.b,
+        );
 
-        // 由于ArceOS环境限制，我们使用模拟的解码方式
-        // 在实际项目中，这里应该调用真正的JPEG解码库
-        self.simulate_jpeg_decode(mjpeg_data)
-    }
+        let brightness_level = self.get_brightness_level(&average_color);
 
-    /// 模拟JPEG解码（用于演示目的）
-    /// 实际应用中应该替换为真正的JPEG解码器
-    fn simulate_jpeg_decode(&self, mjpeg_data: &[u8]) -> Result<Vec<RgbColor>, String> {
-        let mut rgb_pixels = Vec::new();
-
-        // 假设图像尺寸为 640x480（常见的UVC分辨率）
-        let width = 640;
-        let height = 480;
-        let total_pixels = width * height;
-
-        // 从MJPEG数据中提取近似的颜色信息
-        // 这是一个简化的方法，通过分析JPEG数据的字节分布来估算颜色
-        let data_len = mjpeg_data.len();
-        let step = data_len / total_pixels.min(data_len / 3);
-
-        for i in (0..data_len - 2).step_by(step.max(1)) {
-            // 从JPEG数据中提取RGB近似值
-            let r = mjpeg_data[i];
-            let g = mjpeg_data[(i + 1) % data_len];
-            let b = mjpeg_data[(i + 2) % data_len];
-
-            rgb_pixels.push(RgbColor::new(r, g, b));
-
-            if rgb_pixels.len() >= total_pixels / (self.sample_interval * self.sample_interval) {
-                break;
-            }
-        }
-
-        if rgb_pixels.is_empty() {
-            // 如果无法提取像素，创建一些基于数据的默认颜色
-            let avg_byte =
-                mjpeg_data.iter().map(|&b| b as u32).sum::<u32>() / mjpeg_data.len() as u32;
-            rgb_pixels.push(RgbColor::new(
-                avg_byte as u8,
-                avg_byte as u8,
-                avg_byte as u8,
-            ));
-        }
-
-        Ok(rgb_pixels)
+        Ok(ColorDetectionResult {
+            average_color,
+            dominant_color_name: analysis_result.dominant_color_name.to_string(),
+            brightness_level,
+            sampled_pixels: sampled_pixels.len(),
+        })
     }
 
     /// 分析RGB数据并生成颜色检测结果

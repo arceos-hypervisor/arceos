@@ -72,7 +72,7 @@ axtask = { path = "modules/axtask" }
 axdma = { path = "modules/axdma" }
 axipi = { path = "modules/axipi" }
 
-axplat-aarch64-dyn = {git = "https://github.com/arceos-hypervisor/axplat-aarch64-dyn", tag = "v0.1.1"}
+axplat-aarch64-dyn = {git = "https://github.com/arceos-hypervisor/axplat-aarch64-dyn", tag = "v0.1.2"}
 arceos-ext = { path = "phytium/driver/arceos-ext" }
 
 log = "0.4"

@@ -4,8 +4,8 @@ name = "phytium-uvc-detect"
 version = "0.1.0"
 
 [dependencies]
-arceos-ext = {workspace=true}
-axplat-aarch64-dyn = {workspace=true, features = ["irq"]}
+arceos-ext = {workspace = true}
+axplat-aarch64-dyn = {workspace = true, features = ["irq"]}
 axstd = {workspace = true, features = [
   "alloc",
   "paging",
@@ -13,13 +13,15 @@ axstd = {workspace = true, features = [
   "page-alloc-4g",
 ]}
 
-log = {workspace=true}
+log = {workspace = true}
 spin = "0.10"
 spin_on = "0.1"
 
 arceos-usb = {path = "../../driver/arceos-usb"}
 # crab-uvc = {path="/home/zhourui/opensource/CrabUSB/usb-device/uvc"}
-crab-uvc = {git = "https://github.com/drivercraft/CrabUSB.git", tag = "crab-usb-v0.3.8"}
+crab-uvc = {git = "https://github.com/drivercraft/CrabUSB.git", tag = "crab-usb-v0.3.10"}
 
+# MJPEG解码器库
+mjpeg-decoder = {path = "../../driver/mjpeg-decoder"}
 
 [build-dependencies]
