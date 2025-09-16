@@ -216,6 +216,6 @@ pub fn platform_init_secondary() {
     VMM_PLATFORM_INIT_OK.fetch_add(1, Ordering::Relaxed);
     wait_while(|| VMM_PLATFORM_INIT_OK.load(Ordering::Acquire) < HvHeader::get().reserved_cpus());
 
-    info!("Secondary CPU {} platform_init OK.", core_id);
+    debug!("Secondary CPU {} platform_init OK.", core_id);
     // self::time::init_secondary();
 }

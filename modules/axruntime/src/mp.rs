@@ -34,7 +34,7 @@ pub fn start_secondary_cpus(primary_cpu_id: usize) {
 #[unsafe(no_mangle)]
 pub extern "C" fn rust_main_secondary(cpu_id: usize) -> ! {
     ENTERED_CPUS.fetch_add(1, Ordering::Relaxed);
-    info!("Secondary CPU [{cpu_id}] started.");
+    debug!("Secondary CPU [{cpu_id}] started.");
 
     #[cfg(feature = "paging")]
     axmm::init_memory_management_secondary();
@@ -44,7 +44,7 @@ pub extern "C" fn rust_main_secondary(cpu_id: usize) -> ! {
     #[cfg(feature = "multitask")]
     axtask::init_scheduler_secondary();
 
-    info!("Secondary CPU {:x} init OK.", cpu_id);
+    debug!("Secondary CPU {:x} init OK.", cpu_id);
     super::INITED_CPUS.fetch_add(1, Ordering::Relaxed);
 
     while !super::is_init_ok() {
