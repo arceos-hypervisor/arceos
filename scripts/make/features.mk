@@ -54,7 +54,7 @@ ifeq ($(BUS),mmio)
   ax_feat += bus-mmio
 endif
 
-ifeq ($(shell test $(SMP) -gt 1; echo $$?),0)
+ifeq ($(shell test $(SMP) -gt 0; echo $$?),0)
   lib_feat += smp
 endif
 
