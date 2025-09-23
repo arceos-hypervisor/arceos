@@ -39,3 +39,6 @@
 //! [ArceOS]: https://github.com/arceos-org/arceos
 
 #![no_std]
+
+#[cfg(feature = "driver-dyn")]
+extern crate axklib_impl;

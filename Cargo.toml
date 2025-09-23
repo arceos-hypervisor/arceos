@@ -17,10 +17,12 @@ members = [
     "modules/axsync",
     "modules/axtask",
     "modules/axipi",
+    "modules/axklib-impl",
 
     "api/axfeat",
     "api/arceos_api",
     "api/arceos_posix_api",
+    "api/axklib",
 
     "ulib/axstd",
     "ulib/axlibc",
@@ -51,6 +53,7 @@ axlibc = { path = "ulib/axlibc" }
 arceos_api = { path = "api/arceos_api" }
 arceos_posix_api = { path = "api/arceos_posix_api" }
 axfeat = { path = "api/axfeat" }
+axklib = {path = "api/axklib"}
 
 axalloc = { path = "modules/axalloc" }
 axconfig = { path = "modules/axconfig" }
