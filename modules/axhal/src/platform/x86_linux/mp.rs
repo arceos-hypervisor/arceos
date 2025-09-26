@@ -68,8 +68,19 @@ pub fn start_secondary_cpu(core_id: usize, stack_top: PhysAddr) -> bool {
         return false;
     }
 
-    // This is totally hack.
-    let apic_id = super::apic::cpu_id_speculate_apic_id(core_id);
+    let apic_id = if cfg!(platform = "x86_64-nuc15-linux") {
+        // This is totally hack for u5-225h.
+        if core_id >= 12 {
+            (core_id as u32 + 20) * 2
+        } else if core_id >= 4 {
+            (core_id as u32 + 4) * 2
+        } else {
+            super::apic::cpu_id_speculate_apic_id(core_id)
+        }
+    } else {
+        // This is totally hack.
+        super::apic::cpu_id_speculate_apic_id(core_id)
+    };
 
     let boot_fn = || {
         use x86::apic::x2apic::X2APIC;
