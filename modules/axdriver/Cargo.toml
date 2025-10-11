@@ -25,6 +25,8 @@ dyn = [
   "dep:rdif-block",
   "dep:dma-api",
   "dep:axklib",
+  "axdriver_block",
+  "axdriver_block/gpt",
 ]
 input = ["axdriver_input"]
 net = ["axdriver_net"]
