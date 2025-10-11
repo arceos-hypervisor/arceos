@@ -56,14 +56,21 @@ pub fn probe_all_devices() -> Vec<super::AxDeviceEnum> {
         use axdriver_block::gpt::GptPartitionDev;
         let ls = rdrive::get_list::<rdif_block::Block>();
         for dev in ls {
-            let dev_blk = crate::dyn_drivers::blk::Block::from(dev);
-            let root = "rootfs".parse().unwrap();
-            match GptPartitionDev::try_new(dev_blk, |_, part| part.name == root) {
-                Ok(d) => {
-                    info!("Found block device with GPT partition: {}", d.device_name());
-                    devices.push(super::AxDeviceEnum::from_block(d));
+            let mut dev_blk = crate::dyn_drivers::blk::Block::from(dev);
+            if dev_blk.is_gpt_partition() {
+                let root = "rootfs".parse().unwrap();
+                match GptPartitionDev::try_new(dev_blk, |_, part| part.name == root) {
+                    Ok(d) => {
+                        info!("Found block device with GPT partition: {}", d.device_name());
+                        devices.push(super::AxDeviceEnum::from_block(d));
+                    }
+                    Err(e) => {
+                        info!("Failed to find GPT partition 'root': {e}");
+                        // devices.push(super::AxDeviceEnum::from_block(dev_blk));
+                    }
                 }
-                Err(e) => warn!("Failed to find GPT partition 'root': {e}"),
+            } else {
+                devices.push(super::AxDeviceEnum::from_block(dev_blk));
             }
         }
     }

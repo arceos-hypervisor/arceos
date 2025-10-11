@@ -1,7 +1,8 @@
 use axdriver_base::{BaseDriverOps, DevError, DevResult, DeviceType};
 use axdriver_block::BlockDriverOps;
+use gpt_disk_io::{BlockIo, Disk};
 use rdif_block::BlkError;
-use rdrive::Device;
+use rdrive::{Device, DeviceGuard};
 use spin::Mutex;
 
 #[cfg(feature = "virtio-blk")]
@@ -12,10 +13,65 @@ pub struct Block {
     queue: Mutex<rdif_block::CmdQueue>,
 }
 
+impl Block {
+    pub fn is_gpt_partition(&mut self) -> bool {
+        let mut disk = match Disk::new(BlockDriverAdapter(self)) {
+            Ok(d) => d,
+            Err(e) => {
+                return false;
+            }
+        };
+
+        let mut block_buf = [0u8; 512];
+
+        let primary_header = match disk.read_primary_gpt_header(&mut block_buf) {
+            Ok(h) => h,
+            Err(_) => return false,
+        };
+
+        primary_header.is_signature_valid()
+    }
+}
+
+struct BlockDriverAdapter<'a>(&'a mut Block);
+
+impl<'a> BlockIo for BlockDriverAdapter<'a> {
+    type Error = DevError;
+
+    fn block_size(&self) -> gpt_disk_io::gpt_disk_types::BlockSize {
+        gpt_disk_io::gpt_disk_types::BlockSize::from_usize(self.0.block_size()).unwrap()
+    }
+
+    fn num_blocks(&mut self) -> Result<u64, Self::Error> {
+        Ok(self.0.num_blocks())
+    }
+
+    fn read_blocks(
+        &mut self,
+        start_lba: gpt_disk_io::gpt_disk_types::Lba,
+        dst: &mut [u8],
+    ) -> Result<(), Self::Error> {
+        self.0.read_block(start_lba.to_u64(), dst)
+    }
+
+    fn write_blocks(
+        &mut self,
+        start_lba: gpt_disk_io::gpt_disk_types::Lba,
+        src: &[u8],
+    ) -> Result<(), Self::Error> {
+        self.0.write_block(start_lba.to_u64(), src)
+    }
+
+    fn flush(&mut self) -> Result<(), Self::Error> {
+        self.0.flush()
+    }
+}
+
 impl BaseDriverOps for Block {
     fn device_type(&self) -> DeviceType {
         DeviceType::Block
     }
+
     fn device_name(&self) -> &str {
         self.dev.descriptor().name
     }
@@ -25,9 +81,11 @@ impl BlockDriverOps for Block {
     fn num_blocks(&self) -> u64 {
         self.queue.lock().num_blocks() as _
     }
+
     fn block_size(&self) -> usize {
         self.queue.lock().block_size()
     }
+
     fn flush(&mut self) -> DevResult {
         Ok(())
     }

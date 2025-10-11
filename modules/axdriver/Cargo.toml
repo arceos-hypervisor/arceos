@@ -71,6 +71,8 @@ axdriver_net = { git = "https://github.com/Starry-OS/axdriver_crates.git", rev =
 axdriver_pci = { git = "https://github.com/Starry-OS/axdriver_crates.git", rev = "a887828", optional = true }
 axdriver_virtio = { git = "https://github.com/Starry-OS/axdriver_crates.git", rev = "a887828", optional = true }
 
+gpt_disk_io = "0.16.2"
+
 axerrno = {workspace = true}
 axhal = {workspace = true, optional = true}
 
