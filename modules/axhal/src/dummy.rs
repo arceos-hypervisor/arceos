@@ -63,6 +63,10 @@ impl MemIf for DummyMem {
     fn virt_to_phys(_vaddr: memory_addr::VirtAddr) -> memory_addr::PhysAddr {
         pa!(0)
     }
+
+    fn kernel_aspace() -> (memory_addr::VirtAddr, usize) {
+        (memory_addr::va!(0), 0)
+    }
 }
 
 #[impl_plat_interface]
