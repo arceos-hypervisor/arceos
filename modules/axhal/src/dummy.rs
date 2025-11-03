@@ -67,6 +67,10 @@ impl MemIf for DummyMem {
 
 #[impl_plat_interface]
 impl TimeIf for DummyTime {
+    fn irq_num()-> usize{
+        0
+    }
+
     fn current_ticks() -> u64 {
         0
     }
