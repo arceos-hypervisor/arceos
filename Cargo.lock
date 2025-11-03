@@ -943,7 +943,7 @@ dependencies = [
  "axlog",
  "axmm",
  "axnet",
- "axplat 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "axplat 0.2.0 (git+https://github.com/arceos-hypervisor/axplat_crates?branch=vmm-next)",
  "axtask",
  "chrono",
  "crate_interface",

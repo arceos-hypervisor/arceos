@@ -71,5 +71,7 @@ axtask = { path = "modules/axtask" }
 axdma = { path = "modules/axdma" }
 axipi = { path = "modules/axipi" }
 
+axplat = { git = "https://github.com/arceos-hypervisor/axplat_crates", branch = "vmm-next"}
+
 [profile.release]
 lto = true

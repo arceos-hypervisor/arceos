@@ -36,7 +36,7 @@ memory_addr = "0.4"
 linkme = { version = "0.3.33", optional = true }
 page_table_multiarch = { version = "0.5", features = ["copy-from"], optional = true }
 axcpu = "0.2"
-axplat = { git = "https://github.com/arceos-hypervisor/axplat_crates", branch = "vmm-next"}
+axplat.workspace = true
 axlog = { workspace = true }
 axconfig = { workspace = true }
 axalloc = { workspace = true, optional = true }
