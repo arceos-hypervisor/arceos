@@ -123,10 +123,10 @@ version = "0.1.0"
 dependencies = [
  "axplat-aarch64-bsta1000b",
  "axplat-aarch64-phytium-pi",
- "axplat-aarch64-qemu-virt 0.2.0 (git+https://github.com/arceos-hypervisor/axplat_crates.git)",
+ "axplat-aarch64-qemu-virt",
  "axplat-aarch64-raspi",
- "axplat-loongarch64-qemu-virt 0.2.0 (git+https://github.com/arceos-hypervisor/axplat_crates.git)",
- "axplat-riscv64-qemu-virt 0.2.0 (git+https://github.com/arceos-hypervisor/axplat_crates.git)",
+ "axplat-loongarch64-qemu-virt",
+ "axplat-riscv64-qemu-virt",
  "axplat-x86-pc",
  "axstd",
  "cfg-if",
@@ -536,10 +536,10 @@ dependencies = [
  "axconfig",
  "axcpu",
  "axlog",
- "axplat 0.2.0 (git+https://github.com/arceos-hypervisor/axplat_crates?branch=vmm-next)",
- "axplat-aarch64-qemu-virt 0.2.0 (git+https://github.com/arceos-hypervisor/axplat_crates?branch=vmm-next)",
- "axplat-loongarch64-qemu-virt 0.2.0 (git+https://github.com/arceos-hypervisor/axplat_crates?branch=vmm-next)",
- "axplat-riscv64-qemu-virt 0.2.0 (git+https://github.com/arceos-hypervisor/axplat_crates?branch=vmm-next)",
+ "axplat",
+ "axplat-aarch64-qemu-virt",
+ "axplat-loongarch64-qemu-virt",
+ "axplat-riscv64-qemu-virt",
  "axplat-x86-pc",
  "cfg-if",
  "heapless 0.8.0",
@@ -661,21 +661,7 @@ name = "axplat"
 version = "0.2.0"
 source = "git+https://github.com/arceos-hypervisor/axplat_crates?branch=vmm-next#7bebd7b7deae3f485a64442776b54cc058ebd583"
 dependencies = [
- "axplat-macros 0.1.0 (git+https://github.com/arceos-hypervisor/axplat_crates?branch=vmm-next)",
- "bitflags 2.10.0",
- "const-str",
- "crate_interface",
- "handler_table",
- "kspin",
- "memory_addr",
-]
-
-[[package]]
-name = "axplat"
-version = "0.2.0"
-source = "git+https://github.com/arceos-hypervisor/axplat_crates.git#9e93b2807b59518234d5fbdd3d7573c4ded7c4f4"
-dependencies = [
- "axplat-macros 0.1.0 (git+https://github.com/arceos-hypervisor/axplat_crates.git)",
+ "axplat-macros",
  "bitflags 2.10.0",
  "const-str",
  "crate_interface",
@@ -687,12 +673,12 @@ dependencies = [
 [[package]]
 name = "axplat-aarch64-bsta1000b"
 version = "0.2.0"
-source = "git+https://github.com/arceos-hypervisor/axplat_crates.git#9e93b2807b59518234d5fbdd3d7573c4ded7c4f4"
+source = "git+https://github.com/arceos-hypervisor/axplat_crates?branch=vmm-next#7bebd7b7deae3f485a64442776b54cc058ebd583"
 dependencies = [
  "axconfig-macros",
  "axcpu",
- "axplat 0.2.0 (git+https://github.com/arceos-hypervisor/axplat_crates.git)",
- "axplat-aarch64-peripherals 0.2.0 (git+https://github.com/arceos-hypervisor/axplat_crates.git)",
+ "axplat",
+ "axplat-aarch64-peripherals",
  "dw_apb_uart",
  "kspin",
  "log",
@@ -709,26 +695,7 @@ dependencies = [
  "arm_pl011",
  "arm_pl031",
  "axcpu",
- "axplat 0.2.0 (git+https://github.com/arceos-hypervisor/axplat_crates?branch=vmm-next)",
- "int_ratio",
- "kspin",
- "lazyinit",
- "log",
- "page_table_entry",
- "spin 0.10.0",
-]
-
-[[package]]
-name = "axplat-aarch64-peripherals"
-version = "0.2.0"
-source = "git+https://github.com/arceos-hypervisor/axplat_crates.git#9e93b2807b59518234d5fbdd3d7573c4ded7c4f4"
-dependencies = [
- "aarch64-cpu 10.0.0",
- "arm-gic-driver",
- "arm_pl011",
- "arm_pl031",
- "axcpu",
- "axplat 0.2.0 (git+https://github.com/arceos-hypervisor/axplat_crates.git)",
+ "axplat",
  "int_ratio",
  "kspin",
  "lazyinit",
@@ -740,12 +707,12 @@ dependencies = [
 [[package]]
 name = "axplat-aarch64-phytium-pi"
 version = "0.2.0"
-source = "git+https://github.com/arceos-hypervisor/axplat_crates.git#9e93b2807b59518234d5fbdd3d7573c4ded7c4f4"
+source = "git+https://github.com/arceos-hypervisor/axplat_crates?branch=vmm-next#7bebd7b7deae3f485a64442776b54cc058ebd583"
 dependencies = [
  "axconfig-macros",
  "axcpu",
- "axplat 0.2.0 (git+https://github.com/arceos-hypervisor/axplat_crates.git)",
- "axplat-aarch64-peripherals 0.2.0 (git+https://github.com/arceos-hypervisor/axplat_crates.git)",
+ "axplat",
+ "axplat-aarch64-peripherals",
  "log",
  "page_table_entry",
 ]
@@ -757,21 +724,8 @@ source = "git+https://github.com/arceos-hypervisor/axplat_crates?branch=vmm-next
 dependencies = [
  "axconfig-macros",
  "axcpu",
- "axplat 0.2.0 (git+https://github.com/arceos-hypervisor/axplat_crates?branch=vmm-next)",
- "axplat-aarch64-peripherals 0.2.0 (git+https://github.com/arceos-hypervisor/axplat_crates?branch=vmm-next)",
- "log",
- "page_table_entry",
-]
-
-[[package]]
-name = "axplat-aarch64-qemu-virt"
-version = "0.2.0"
-source = "git+https://github.com/arceos-hypervisor/axplat_crates.git#9e93b2807b59518234d5fbdd3d7573c4ded7c4f4"
-dependencies = [
- "axconfig-macros",
- "axcpu",
- "axplat 0.2.0 (git+https://github.com/arceos-hypervisor/axplat_crates.git)",
- "axplat-aarch64-peripherals 0.2.0 (git+https://github.com/arceos-hypervisor/axplat_crates.git)",
+ "axplat",
+ "axplat-aarch64-peripherals",
  "log",
  "page_table_entry",
 ]
@@ -779,13 +733,13 @@ dependencies = [
 [[package]]
 name = "axplat-aarch64-raspi"
 version = "0.2.0"
-source = "git+https://github.com/arceos-hypervisor/axplat_crates.git#9e93b2807b59518234d5fbdd3d7573c4ded7c4f4"
+source = "git+https://github.com/arceos-hypervisor/axplat_crates?branch=vmm-next#7bebd7b7deae3f485a64442776b54cc058ebd583"
 dependencies = [
  "aarch64-cpu 10.0.0",
  "axconfig-macros",
  "axcpu",
- "axplat 0.2.0 (git+https://github.com/arceos-hypervisor/axplat_crates.git)",
- "axplat-aarch64-peripherals 0.2.0 (git+https://github.com/arceos-hypervisor/axplat_crates.git)",
+ "axplat",
+ "axplat-aarch64-peripherals",
  "log",
  "page_table_entry",
 ]
@@ -797,7 +751,7 @@ source = "git+https://github.com/arceos-hypervisor/axplat_crates?branch=vmm-next
 dependencies = [
  "axconfig-macros",
  "axcpu",
- "axplat 0.2.0 (git+https://github.com/arceos-hypervisor/axplat_crates?branch=vmm-next)",
+ "axplat",
  "chrono",
  "kspin",
  "lazyinit",
@@ -808,35 +762,9 @@ dependencies = [
 ]
 
 [[package]]
-name = "axplat-loongarch64-qemu-virt"
-version = "0.2.0"
-source = "git+https://github.com/arceos-hypervisor/axplat_crates.git#9e93b2807b59518234d5fbdd3d7573c4ded7c4f4"
-dependencies = [
- "axconfig-macros",
- "axcpu",
- "axplat 0.2.0 (git+https://github.com/arceos-hypervisor/axplat_crates.git)",
- "kspin",
- "lazyinit",
- "log",
- "loongArch64",
- "ns16550a",
- "page_table_entry",
-]
-
-[[package]]
 name = "axplat-macros"
 version = "0.1.0"
 source = "git+https://github.com/arceos-hypervisor/axplat_crates?branch=vmm-next#7bebd7b7deae3f485a64442776b54cc058ebd583"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.108",
-]
-
-[[package]]
-name = "axplat-macros"
-version = "0.1.0"
-source = "git+https://github.com/arceos-hypervisor/axplat_crates.git#9e93b2807b59518234d5fbdd3d7573c4ded7c4f4"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -850,23 +778,10 @@ source = "git+https://github.com/arceos-hypervisor/axplat_crates?branch=vmm-next
 dependencies = [
  "axconfig-macros",
  "axcpu",
- "axplat 0.2.0 (git+https://github.com/arceos-hypervisor/axplat_crates?branch=vmm-next)",
+ "axplat",
  "log",
  "riscv",
  "riscv_goldfish",
- "sbi-rt",
-]
-
-[[package]]
-name = "axplat-riscv64-qemu-virt"
-version = "0.2.0"
-source = "git+https://github.com/arceos-hypervisor/axplat_crates.git#9e93b2807b59518234d5fbdd3d7573c4ded7c4f4"
-dependencies = [
- "axconfig-macros",
- "axcpu",
- "axplat 0.2.0 (git+https://github.com/arceos-hypervisor/axplat_crates.git)",
- "log",
- "riscv",
  "sbi-rt",
 ]
 
@@ -877,7 +792,7 @@ source = "git+https://github.com/arceos-hypervisor/axplat_crates?branch=vmm-next
 dependencies = [
  "axconfig-macros",
  "axcpu",
- "axplat 0.2.0 (git+https://github.com/arceos-hypervisor/axplat_crates?branch=vmm-next)",
+ "axplat",
  "bitflags 2.10.0",
  "heapless 0.9.1",
  "int_ratio",
@@ -909,7 +824,7 @@ dependencies = [
  "axlog",
  "axmm",
  "axnet",
- "axplat 0.2.0 (git+https://github.com/arceos-hypervisor/axplat_crates?branch=vmm-next)",
+ "axplat",
  "axtask",
  "chrono",
  "crate_interface",
