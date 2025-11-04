@@ -17,7 +17,7 @@ use axhal::mem::{MemRegionFlags, phys_to_virt};
 use axhal::paging::MappingFlags;
 use kspin::SpinNoIrq;
 use lazyinit::LazyInit;
-use memory_addr::{MemoryAddr, PhysAddr, VirtAddr, va};
+use memory_addr::{MemoryAddr, PhysAddr, VirtAddr};
 use memory_set::MappingError;
 
 static KERNEL_ASPACE: LazyInit<SpinNoIrq<AddrSpace>> = LazyInit::new();
