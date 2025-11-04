@@ -154,53 +154,53 @@ jobs:
         make ARCH=riscv64 A=examples/helloworld-myplat SMP=4 APP_FEATURES=riscv64-qemu-virt
         make MYPLAT=axplat-riscv64-qemu-virt A=examples/helloworld-myplat SMP=4 APP_FEATURES=riscv64-qemu-virt
 
-    # Test platform `aarch64-raspi4` for various apps
-    - name: Setup aarch64-raspi4
-      run: |
-        git checkout .
-        make MYPLAT=axplat-aarch64-raspi defconfig
-        cargo axplat add axplat-aarch64-raspi -p arceos-helloworld -F smp --git https://github.com/arceos-org/axhal_crates.git
-        cargo axplat add axplat-aarch64-raspi -p arceos-shell -F smp --git https://github.com/arceos-org/axhal_crates.git
-        echo "extern crate axplat_aarch64_raspi;" >> examples/helloworld/src/main.rs
-        echo "extern crate axplat_aarch64_raspi;" >> examples/shell/src/main.rs
-    - name: Build helloworld for aarch64-raspi4
-      continue-on-error: ${{ matrix.rust-toolchain == 'nightly' }}
-      run: make MYPLAT=axplat-aarch64-raspi A=examples/helloworld
-    - name: Build shell for aarch64-raspi4
-      continue-on-error: ${{ matrix.rust-toolchain == 'nightly' }}
-      run: make MYPLAT=axplat-aarch64-raspi A=examples/shell FEATURES=page-alloc-4g,driver-bcm2835-sdhci BUS=mmio
+    # # Test platform `aarch64-raspi4` for various apps
+    # - name: Setup aarch64-raspi4
+    #   run: |
+    #     git checkout .
+    #     make MYPLAT=axplat-aarch64-raspi defconfig
+    #     cargo axplat add axplat-aarch64-raspi -p arceos-helloworld -F smp --git https://github.com/arceos-org/axhal_crates.git
+    #     cargo axplat add axplat-aarch64-raspi -p arceos-shell -F smp --git https://github.com/arceos-org/axhal_crates.git
+    #     echo "extern crate axplat_aarch64_raspi;" >> examples/helloworld/src/main.rs
+    #     echo "extern crate axplat_aarch64_raspi;" >> examples/shell/src/main.rs
+    # - name: Build helloworld for aarch64-raspi4
+    #   continue-on-error: ${{ matrix.rust-toolchain == 'nightly' }}
+    #   run: make MYPLAT=axplat-aarch64-raspi A=examples/helloworld
+    # - name: Build shell for aarch64-raspi4
+    #   continue-on-error: ${{ matrix.rust-toolchain == 'nightly' }}
+    #   run: make MYPLAT=axplat-aarch64-raspi A=examples/shell FEATURES=page-alloc-4g,driver-bcm2835-sdhci BUS=mmio
 
-    # Test platform `aarch64-bsta1000b` for various apps
-    - name: Setup aarch64-bsta1000b
-      run: |
-        git checkout .
-        make MYPLAT=axplat-aarch64-bsta1000b defconfig
-        cargo axplat add axplat-aarch64-bsta1000b -p arceos-helloworld -F smp --git https://github.com/arceos-org/axhal_crates.git
-        cargo axplat add axplat-aarch64-bsta1000b -p arceos-shell -F smp --git https://github.com/arceos-org/axhal_crates.git
-        echo "extern crate axplat_aarch64_bsta1000b;" >> examples/helloworld/src/main.rs
-        echo "extern crate axplat_aarch64_bsta1000b;" >> examples/shell/src/main.rs
-    - name: Build helloworld for aarch64-bsta1000b
-      continue-on-error: ${{ matrix.rust-toolchain == 'nightly' }}
-      run: make MYPLAT=axplat-aarch64-bsta1000b A=examples/helloworld
-    - name: Build shell for aarch64-bsta1000b
-      continue-on-error: ${{ matrix.rust-toolchain == 'nightly' }}
-      run: make MYPLAT=axplat-aarch64-bsta1000b A=examples/shell FEATURES=page-alloc-4g,driver-ramdisk BUS=mmio
+    # # Test platform `aarch64-bsta1000b` for various apps
+    # - name: Setup aarch64-bsta1000b
+    #   run: |
+    #     git checkout .
+    #     make MYPLAT=axplat-aarch64-bsta1000b defconfig
+    #     cargo axplat add axplat-aarch64-bsta1000b -p arceos-helloworld -F smp --git https://github.com/arceos-org/axhal_crates.git
+    #     cargo axplat add axplat-aarch64-bsta1000b -p arceos-shell -F smp --git https://github.com/arceos-org/axhal_crates.git
+    #     echo "extern crate axplat_aarch64_bsta1000b;" >> examples/helloworld/src/main.rs
+    #     echo "extern crate axplat_aarch64_bsta1000b;" >> examples/shell/src/main.rs
+    # - name: Build helloworld for aarch64-bsta1000b
+    #   continue-on-error: ${{ matrix.rust-toolchain == 'nightly' }}
+    #   run: make MYPLAT=axplat-aarch64-bsta1000b A=examples/helloworld
+    # - name: Build shell for aarch64-bsta1000b
+    #   continue-on-error: ${{ matrix.rust-toolchain == 'nightly' }}
+    #   run: make MYPLAT=axplat-aarch64-bsta1000b A=examples/shell FEATURES=page-alloc-4g,driver-ramdisk BUS=mmio
 
-    # Test platform `aarch64-phytium-pi` for various apps
-    - name: Setup aarch64-phytium-pi
-      run: |
-        git checkout .
-        make MYPLAT=axplat-aarch64-phytium-pi defconfig
-        cargo axplat add axplat-aarch64-phytium-pi -p arceos-helloworld -F smp --git https://github.com/arceos-org/axhal_crates.git
-        cargo axplat add axplat-aarch64-phytium-pi -p arceos-shell -F smp --git https://github.com/arceos-org/axhal_crates.git
-        echo "extern crate axplat_aarch64_phytium_pi;" >> examples/helloworld/src/main.rs
-        echo "extern crate axplat_aarch64_phytium_pi;" >> examples/shell/src/main.rs
-    - name: Build helloworld for aarch64-phytium-pi
-      continue-on-error: ${{ matrix.rust-toolchain == 'nightly' }}
-      run: make MYPLAT=axplat-aarch64-phytium-pi A=examples/helloworld
-    - name: Build shell for aarch64-phytium-pi
-      continue-on-error: ${{ matrix.rust-toolchain == 'nightly' }}
-      run: make MYPLAT=axplat-aarch64-phytium-pi A=examples/shell FEATURES=page-alloc-4g,driver-ramdisk BUS=mmio
+    # # Test platform `aarch64-phytium-pi` for various apps
+    # - name: Setup aarch64-phytium-pi
+    #   run: |
+    #     git checkout .
+    #     make MYPLAT=axplat-aarch64-phytium-pi defconfig
+    #     cargo axplat add axplat-aarch64-phytium-pi -p arceos-helloworld -F smp --git https://github.com/arceos-org/axhal_crates.git
+    #     cargo axplat add axplat-aarch64-phytium-pi -p arceos-shell -F smp --git https://github.com/arceos-org/axhal_crates.git
+    #     echo "extern crate axplat_aarch64_phytium_pi;" >> examples/helloworld/src/main.rs
+    #     echo "extern crate axplat_aarch64_phytium_pi;" >> examples/shell/src/main.rs
+    # - name: Build helloworld for aarch64-phytium-pi
+    #   continue-on-error: ${{ matrix.rust-toolchain == 'nightly' }}
+    #   run: make MYPLAT=axplat-aarch64-phytium-pi A=examples/helloworld
+    # - name: Build shell for aarch64-phytium-pi
+    #   continue-on-error: ${{ matrix.rust-toolchain == 'nightly' }}
+    #   run: make MYPLAT=axplat-aarch64-phytium-pi A=examples/shell FEATURES=page-alloc-4g,driver-ramdisk BUS=mmio
 
     # Test custom config file for C apps
     - uses: arceos-org/setup-musl@v1

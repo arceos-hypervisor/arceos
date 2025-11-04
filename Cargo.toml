@@ -71,5 +71,16 @@ axtask = { path = "modules/axtask" }
 axdma = { path = "modules/axdma" }
 axipi = { path = "modules/axipi" }
 
+axplat = { git = "https://github.com/arceos-hypervisor/axplat_crates", tag="vmm-v0.3.0" }
+
+axplat-x86-pc = {git = "https://github.com/arceos-hypervisor/axplat_crates.git", tag = "vmm-v0.3.0" }
+axplat-aarch64-bsta1000b = {git = "https://github.com/arceos-hypervisor/axplat_crates.git", tag = "vmm-v0.3.0"}
+axplat-aarch64-phytium-pi = {git = "https://github.com/arceos-hypervisor/axplat_crates.git", tag = "vmm-v0.3.0" }
+axplat-aarch64-qemu-virt = {git = "https://github.com/arceos-hypervisor/axplat_crates.git", tag = "vmm-v0.3.0" }
+axplat-aarch64-raspi = {git = "https://github.com/arceos-hypervisor/axplat_crates.git", tag = "vmm-v0.3.0" }
+axplat-riscv64-qemu-virt = {git = "https://github.com/arceos-hypervisor/axplat_crates.git", tag = "vmm-v0.3.0"}
+axplat-loongarch64-qemu-virt = {git = "https://github.com/arceos-hypervisor/axplat_crates.git", tag = "vmm-v0.3.0"}
+
+
 [profile.release]
 lto = true

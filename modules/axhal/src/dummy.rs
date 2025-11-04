@@ -63,10 +63,18 @@ impl MemIf for DummyMem {
     fn virt_to_phys(_vaddr: memory_addr::VirtAddr) -> memory_addr::PhysAddr {
         pa!(0)
     }
+
+    fn kernel_aspace() -> (memory_addr::VirtAddr, usize) {
+        (memory_addr::va!(0), 0)
+    }
 }
 
 #[impl_plat_interface]
 impl TimeIf for DummyTime {
+    fn irq_num() -> usize {
+        0
+    }
+
     fn current_ticks() -> u64 {
         0
     }
