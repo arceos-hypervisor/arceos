@@ -58,7 +58,7 @@ cfg-if = "1.0"
 crate_interface = "0.1.4"
 dma-api = {version = "0.5", features = ["alloc"], optional = true}
 lazyinit = "0.2"
-log = "=0.4.21"
+log = "0.4"
 memory_addr = "0.4"
 rdif-block = {version = "0.6.2", optional = true}
 rdif-intc = {version = "0.12", optional = true}

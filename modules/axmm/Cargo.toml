@@ -1,23 +1,23 @@
 [package]
-name = "axmm"
-version.workspace = true
-edition.workspace = true
 authors = ["Yuekai Jia <equation618@gmail.com>"]
 description = "ArceOS virtual memory management module"
-license.workspace = true
-homepage.workspace = true
-repository = "https://github.com/arceos-org/arceos/tree/main/modules/axmm"
 documentation = "https://arceos-org.github.io/arceos/axmm/index.html"
+edition.workspace = true
+homepage.workspace = true
+license.workspace = true
+name = "axmm"
+repository = "https://github.com/arceos-org/arceos/tree/main/modules/axmm"
+version.workspace = true
 
 [features]
 
 [dependencies]
-axhal = { workspace = true, features = ["paging"] }
-axalloc = { workspace = true }
+axalloc = {workspace = true}
+axhal = {workspace = true, features = ["paging"]}
 
-log = "=0.4.21"
 axerrno = "0.1"
-lazyinit = "0.2"
-memory_addr = "0.4"
 kspin = "0.1"
+lazyinit = "0.2"
+log = "0.4"
+memory_addr = "0.4"
 memory_set = "0.4"

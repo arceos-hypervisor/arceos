@@ -1,17 +1,17 @@
 [package]
-name = "axdisplay"
-version.workspace = true
-edition.workspace = true
 authors = ["Shiping Yuan <robert_yuan@pku.edu.com>"]
 description = "ArceOS graphics module"
-license.workspace = true
-homepage.workspace = true
-repository = "https://github.com/arceos-org/arceos/tree/main/modules/axdisplay"
 documentation = "https://arceos-org.github.io/arceos/axdisplay/index.html"
+edition.workspace = true
+homepage.workspace = true
+license.workspace = true
+name = "axdisplay"
+repository = "https://github.com/arceos-org/arceos/tree/main/modules/axdisplay"
+version.workspace = true
 
 [dependencies]
-log = "=0.4.21"
+axdriver = {workspace = true, features = ["display"]}
+axdriver_display = {git = "https://github.com/arceos-org/axdriver_crates.git", tag = "v0.1.2"}
+axsync = {workspace = true}
 lazyinit = "0.2"
-axdriver = { workspace = true, features = ["display"] }
-axsync = { workspace = true }
-axdriver_display = { git = "https://github.com/arceos-org/axdriver_crates.git", tag = "v0.1.2" }
+log = "0.4"

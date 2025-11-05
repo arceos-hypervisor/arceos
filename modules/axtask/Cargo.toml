@@ -1,56 +1,56 @@
 [package]
-name = "axtask"
-version.workspace = true
-edition.workspace = true
 authors = ["Yuekai Jia <equation618@gmail.com>"]
 description = "ArceOS task management module"
-license.workspace = true
-homepage.workspace = true
-repository = "https://github.com/arceos-org/arceos/tree/main/modules/axtask"
 documentation = "https://arceos-org.github.io/arceos/axtask/index.html"
+edition.workspace = true
+homepage.workspace = true
+license.workspace = true
+name = "axtask"
+repository = "https://github.com/arceos-org/arceos/tree/main/modules/axtask"
+version.workspace = true
 
 [features]
 default = []
 
-multitask = [
-    "dep:axconfig",
-    "dep:percpu",
-    "dep:kspin",
-    "dep:lazyinit",
-    "dep:memory_addr",
-    "dep:axsched",
-    "dep:timer_list",
-    "kernel_guard",
-    "dep:crate_interface",
-    "dep:cpumask",
-]
 irq = []
-tls = ["axhal/tls"]
+multitask = [
+  "dep:axconfig",
+  "dep:percpu",
+  "dep:kspin",
+  "dep:lazyinit",
+  "dep:memory_addr",
+  "dep:axsched",
+  "dep:timer_list",
+  "kernel_guard",
+  "dep:crate_interface",
+  "dep:cpumask",
+]
 preempt = ["irq", "percpu?/preempt", "kernel_guard/preempt"]
 smp = ["kspin/smp"]
+tls = ["axhal/tls"]
 
+sched-cfs = ["multitask", "preempt"]
 sched-fifo = ["multitask"]
 sched-rr = ["multitask", "preempt"]
-sched-cfs = ["multitask", "preempt"]
 
 test = ["percpu?/sp-naive"]
 
 [dependencies]
+axconfig = {workspace = true, optional = true}
+axhal = {workspace = true}
+axsched = {version = "0.3", optional = true}
 cfg-if = "1.0"
-log = "=0.4.21"
-axhal = { workspace = true }
-axconfig = { workspace = true, optional = true }
-percpu = { version = "0.2", optional = true }
-kspin = { version = "0.1", optional = true }
-lazyinit = { version = "0.2", optional = true }
-memory_addr = { version = "0.4", optional = true }
-timer_list = { version = "0.1", optional = true }
-kernel_guard = { version = "0.1", optional = true }
-crate_interface = { version = "0.1", optional = true }
-cpumask = { version = "0.1", optional = true }
-axsched = { version = "0.3", optional = true }
+cpumask = {version = "0.1", optional = true}
+crate_interface = {version = "0.1", optional = true}
+kernel_guard = {version = "0.1", optional = true}
+kspin = {version = "0.1", optional = true}
+lazyinit = {version = "0.2", optional = true}
+log = "0.4"
+memory_addr = {version = "0.4", optional = true}
+percpu = {version = "0.2", optional = true}
+timer_list = {version = "0.1", optional = true}
 
 [dev-dependencies]
+axhal = {workspace = true, features = ["fp-simd"]}
+axtask = {workspace = true, features = ["test", "multitask"]}
 rand = "0.9"
-axhal = { workspace = true, features = ["fp-simd"] }
-axtask = { workspace = true, features = ["test", "multitask"] }
