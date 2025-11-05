@@ -14,7 +14,7 @@ version.workspace = true
 irq = ["axhal/irq"]
 
 [dependencies]
-axhal = {workspace = true}
-axklib = {path = "../../api/axklib"}
-axmm = {workspace = true}
+axhal = { workspace = true }
+axklib = { workspace = true }
+axmm = { workspace = true }
 trait-ffi = "0.2"

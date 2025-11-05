@@ -22,7 +22,6 @@ members = [
     "api/axfeat",
     "api/arceos_api",
     "api/arceos_posix_api",
-    "api/axklib",
 
     "ulib/axstd",
     "ulib/axlibc",
@@ -30,7 +29,6 @@ members = [
     "examples/helloworld",
     "examples/helloworld-myplat",
     "examples/httpclient",
-    "examples/httpserver",
     "examples/httpserver",
     "examples/shell",
 ]
@@ -53,7 +51,7 @@ axlibc = { path = "ulib/axlibc" }
 arceos_api = { path = "api/arceos_api" }
 arceos_posix_api = { path = "api/arceos_posix_api" }
 axfeat = { path = "api/axfeat" }
-axklib = {path = "api/axklib"}
+axklib = { git = "https://github.com/arceos-hypervisor/axklib.git" }
 
 axalloc = { path = "modules/axalloc" }
 axconfig = { path = "modules/axconfig" }
@@ -61,6 +59,7 @@ axdisplay = { path = "modules/axdisplay" }
 axdriver = { path = "modules/axdriver" }
 axfs = { path = "modules/axfs" }
 axhal = { path = "modules/axhal" }
+axklib-impl = { path = "modules/axklib-impl" }
 axlog = { path = "modules/axlog" }
 axmm = { path = "modules/axmm" }
 axnet = { path = "modules/axnet" }

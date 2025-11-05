@@ -575,9 +575,11 @@ dependencies = [
 
 [[package]]
 name = "axklib"
-version = "0.2.0"
+version = "0.1.0"
+source = "git+https://github.com/arceos-hypervisor/axklib.git#22d120d3cecc905340f31cb6895f8b47f28103a9"
 dependencies = [
  "axerrno",
+ "axplat",
  "memory_addr",
  "trait-ffi",
 ]

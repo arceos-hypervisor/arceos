@@ -89,4 +89,4 @@ axsync = { workspace = true, optional = true }
 axtask = { workspace = true, optional = true }
 axipi = { workspace = true, optional = true }
 kspin = { version = "0.1", optional = true }
-axklib-impl = {path = "../../modules/axklib-impl", optional = true}
+axklib-impl = { workspace = true, optional = true }
