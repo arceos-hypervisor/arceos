@@ -218,6 +218,9 @@ else
 	$(call make_disk_image,fat32,$(DISK_IMG))
 endif
 
+ext4_img:
+	dd if=/dev/zero of=disk.img bs=1M count=32 && mkfs.ext4 disk.img
+
 clean: clean_c
 	rm -rf $(APP)/*.bin $(APP)/*.elf $(OUT_CONFIG)
 	cargo clean

@@ -1,5 +1,6 @@
 use alloc::sync::Arc;
-use core::cell::UnsafeCell;
+use alloc::boxed::Box;
+use core::cell::OnceCell;
 
 use axfs_vfs::{VfsDirEntry, VfsError, VfsNodePerm, VfsResult};
 use axfs_vfs::{VfsNodeAttr, VfsNodeOps, VfsNodeRef, VfsNodeType, VfsOps};
@@ -12,7 +13,7 @@ const BLOCK_SIZE: usize = 512;
 
 pub struct FatFileSystem {
     inner: fatfs::FileSystem<Disk, NullTimeProvider, LossyOemCpConverter>,
-    root_dir: UnsafeCell<Option<VfsNodeRef>>,
+    root_dir: OnceCell<VfsNodeRef>,
 }
 
 pub struct FileWrapper<'a>(Mutex<File<'a, Disk, NullTimeProvider, LossyOemCpConverter>>);
@@ -32,9 +33,13 @@ impl FatFileSystem {
         fatfs::format_volume(&mut disk, opts).expect("failed to format volume");
         let inner = fatfs::FileSystem::new(disk, fatfs::FsOptions::new())
             .expect("failed to initialize FAT filesystem");
+        
+        // Initialize root_dir immediately
+        let root_dir = Self::new_dir(inner.root_dir());
+        
         Self {
             inner,
-            root_dir: UnsafeCell::new(None),
+            root_dir: UnsafeCell::new(Some(root_dir)),
         }
     }
 
@@ -44,21 +49,28 @@ impl FatFileSystem {
             .expect("failed to initialize FAT filesystem");
         Self {
             inner,
-            root_dir: UnsafeCell::new(None),
+            root_dir: OnceCell::new(),
         }
     }
 
     pub fn init(&'static self) {
-        // must be called before later operations
-        unsafe { *self.root_dir.get() = Some(Self::new_dir(self.inner.root_dir())) }
+        // root_dir is already initialized in new(), so nothing to do here
     }
 
-    fn new_file(file: File<'_, Disk, NullTimeProvider, LossyOemCpConverter>) -> Arc<FileWrapper> {
-        Arc::new(FileWrapper(Mutex::new(file)))
+    fn new_file(file: File<'_, Disk, NullTimeProvider, LossyOemCpConverter>) -> VfsNodeRef {
+        // Use a Box to extend the lifetime of the file
+        let file_box = Box::new(file);
+        let file_static = unsafe { core::mem::transmute::<Box<File<'_, Disk, NullTimeProvider, LossyOemCpConverter>>, Box<File<'static, Disk, NullTimeProvider, LossyOemCpConverter>>>(file_box) };
+        let file_wrapper = FileWrapper(Mutex::new(*file_static));
+        Arc::new(file_wrapper) as VfsNodeRef
     }
 
-    fn new_dir(dir: Dir<'_, Disk, NullTimeProvider, LossyOemCpConverter>) -> Arc<DirWrapper> {
-        Arc::new(DirWrapper(dir))
+    fn new_dir(dir: Dir<'_, Disk, NullTimeProvider, LossyOemCpConverter>) -> VfsNodeRef {
+        // Use a Box to extend the lifetime of the dir
+        let dir_box = Box::new(dir);
+        let dir_static = unsafe { core::mem::transmute::<Box<Dir<'_, Disk, NullTimeProvider, LossyOemCpConverter>>, Box<Dir<'static, Disk, NullTimeProvider, LossyOemCpConverter>>>(dir_box) };
+        let dir_wrapper = DirWrapper(*dir_static);
+        Arc::new(dir_wrapper) as VfsNodeRef
     }
 }
 
@@ -218,8 +230,12 @@ impl VfsNodeOps for DirWrapper<'static> {
 
 impl VfsOps for FatFileSystem {
     fn root_dir(&self) -> VfsNodeRef {
-        let root_dir = unsafe { (*self.root_dir.get()).as_ref().unwrap() };
-        root_dir.clone()
+        self.root_dir.get_or_init(|| {
+            debug!("Creating root directory for FAT filesystem");
+            let root_dir = self.inner.root_dir();
+            debug!("Successfully got root directory from FAT filesystem");
+            Self::new_dir(root_dir)
+        }).clone()
     }
 }
 

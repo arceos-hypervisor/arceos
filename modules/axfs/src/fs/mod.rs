@@ -1,12 +1,5 @@
-cfg_if::cfg_if! {
-    if #[cfg(feature = "myfs")] {
-        pub mod myfs;
-    } else if #[cfg(feature = "ext4fs")] {
-        pub mod ext4fs;
-    } else if #[cfg(feature = "fatfs")] {
-        pub mod fatfs;
-    }
-}
+pub mod ext4fs;
+pub mod fatfs;
 
 #[cfg(feature = "devfs")]
 pub use axfs_devfs as devfs;

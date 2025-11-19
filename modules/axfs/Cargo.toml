@@ -11,15 +11,13 @@ version.workspace = true
 
 [features]
 devfs = ["dep:axfs_devfs"]
-ext4fs = ["dep:lwext4_rust"]
-fatfs = ["dep:fatfs"]
 myfs = ["dep:crate_interface"]
 procfs = ["dep:axfs_ramfs"]
 ramfs = ["dep:axfs_ramfs"]
 sysfs = ["dep:axfs_ramfs"]
 use-ramdisk = []
 
-default = ["devfs", "ramfs", "fatfs", "procfs", "sysfs"]
+default = ["devfs", "ramfs", "procfs", "sysfs"]
 
 [dependencies]
 axdriver = {workspace = true, features = ["block"]}
@@ -36,7 +34,7 @@ cfg-if = "1.0"
 crate_interface = {version = "0.1", optional = true}
 lazyinit = "0.2"
 log = "0.4"
-lwext4_rust = {git = "https://github.com/Josen-B/lwext4_rust.git", optional = true}
+lwext4_rust = {git = "https://github.com/Josen-B/lwext4_rust.git"}
 
 [dependencies.fatfs]
 default-features = false
@@ -48,7 +46,6 @@ features = [
   "unicode",
 ]
 git = "https://github.com/rafalh/rust-fatfs"
-optional = true
 rev = "4eccb50"
 
 [dev-dependencies]

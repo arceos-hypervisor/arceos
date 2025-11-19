@@ -9,7 +9,7 @@ use axns::{ResArc, def_resource};
 use axsync::Mutex;
 use lazyinit::LazyInit;
 
-use crate::{api::FileType, fs, mounts};
+use crate::{api::FileType, mounts, partition::{PartitionInfo, FilesystemType, create_filesystem_for_partition}};
 
 def_resource! {
     static CURRENT_DIR_PATH: ResArc<Mutex<String>> = ResArc::new();
@@ -146,25 +146,43 @@ impl VfsNodeOps for RootDirectory {
     }
 }
 
-pub(crate) fn init_rootfs(disk: crate::dev::Disk) {
-    cfg_if::cfg_if! {
-        if #[cfg(feature = "myfs")] { // override the default filesystem
-            let main_fs = fs::myfs::new_myfs(disk);
-        } else if #[cfg(feature = "ext4fs")] {
-            static EXT4_FS: LazyInit<Arc<fs::ext4fs::Ext4FileSystem>> = LazyInit::new();
-            EXT4_FS.init_once(Arc::new(fs::ext4fs::Ext4FileSystem::new(disk)));
-            let main_fs = EXT4_FS.clone();
-        } else if #[cfg(feature = "fatfs")] {
-            static FAT_FS: LazyInit<Arc<fs::fatfs::FatFileSystem>> = LazyInit::new();
-            FAT_FS.init_once(Arc::new(fs::fatfs::FatFileSystem::new(disk)));
-            FAT_FS.init();
-            let main_fs = FAT_FS.clone();
+
+
+/// Initialize root filesystem with dynamic partition detection
+pub(crate) fn init_rootfs_with_partitions(disk: crate::dev::Disk, partitions: Vec<PartitionInfo>) -> bool {
+    info!("Initializing root filesystem with {} partitions", partitions.len());
+    
+    // Find the first partition with a supported filesystem as the root
+    let mut main_fs = None;
+    let mut _root_partition_index = None;
+    
+    // For now, just use the first partition
+    // This is a limitation of the current implementation
+    if let Some(partition) = partitions.first() {
+        match create_filesystem_for_partition(disk, partition) {
+            Ok(fs) => {
+                info!("Using partition '{}' ({:?}) as root filesystem", 
+                      partition.name, partition.filesystem_type.unwrap_or(FilesystemType::Unknown));
+                main_fs = Some(fs);
+                _root_partition_index = Some(0);
+            }
+            Err(e) => {
+                warn!("Failed to create filesystem for partition '{}': {:?}", partition.name, e);
+            }
         }
     }
+    
+    // If no supported filesystem found, fall back to default behavior
+    let main_fs = match main_fs {
+        Some(fs) => fs,
+        None => {
+            warn!("No supported filesystem found in partitions");
+            return false;
+        }
+    };
 
     let mut root_dir = RootDirectory::new(main_fs);
 
-    #[cfg(feature = "devfs")]
     root_dir
         .mount("/dev", mounts::devfs())
         .expect("failed to mount devfs at /dev");
@@ -188,7 +206,8 @@ pub(crate) fn init_rootfs(disk: crate::dev::Disk) {
 
     ROOT_DIR.init_once(Arc::new(root_dir));
     CURRENT_DIR.init_new(Mutex::new(ROOT_DIR.clone()));
-    CURRENT_DIR_PATH.init_new(Mutex::new("/".into()));
+    CURRENT_DIR_PATH.init_new(Mutex::new(String::from("/")));
+    true
 }
 
 fn parent_node_of(dir: Option<&VfsNodeRef>, path: &str) -> VfsNodeRef {
