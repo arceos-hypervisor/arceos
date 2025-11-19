@@ -9,7 +9,11 @@ use axns::{ResArc, def_resource};
 use axsync::Mutex;
 use lazyinit::LazyInit;
 
-use crate::{api::FileType, mounts, partition::{PartitionInfo, FilesystemType, create_filesystem_for_partition}};
+use crate::{
+    api::FileType,
+    mounts,
+    partition::{FilesystemType, PartitionInfo, create_filesystem_for_partition},
+};
 
 def_resource! {
     static CURRENT_DIR_PATH: ResArc<Mutex<String>> = ResArc::new();
@@ -146,32 +150,42 @@ impl VfsNodeOps for RootDirectory {
     }
 }
 
-
-
 /// Initialize root filesystem with dynamic partition detection
-pub(crate) fn init_rootfs_with_partitions(disk: crate::dev::Disk, partitions: Vec<PartitionInfo>) -> bool {
-    info!("Initializing root filesystem with {} partitions", partitions.len());
-    
+pub(crate) fn init_rootfs_with_partitions(
+    disk: crate::dev::Disk,
+    partitions: Vec<PartitionInfo>,
+) -> bool {
+    info!(
+        "Initializing root filesystem with {} partitions",
+        partitions.len()
+    );
+
     // Find the first partition with a supported filesystem as the root
     let mut main_fs = None;
     let mut _root_partition_index = None;
-    
+
     // For now, just use the first partition
     // This is a limitation of the current implementation
     if let Some(partition) = partitions.first() {
         match create_filesystem_for_partition(disk, partition) {
             Ok(fs) => {
-                info!("Using partition '{}' ({:?}) as root filesystem", 
-                      partition.name, partition.filesystem_type.unwrap_or(FilesystemType::Unknown));
+                info!(
+                    "Using partition '{}' ({:?}) as root filesystem",
+                    partition.name,
+                    partition.filesystem_type.unwrap_or(FilesystemType::Unknown)
+                );
                 main_fs = Some(fs);
                 _root_partition_index = Some(0);
             }
             Err(e) => {
-                warn!("Failed to create filesystem for partition '{}': {:?}", partition.name, e);
+                warn!(
+                    "Failed to create filesystem for partition '{}': {:?}",
+                    partition.name, e
+                );
             }
         }
     }
-    
+
     // If no supported filesystem found, fall back to default behavior
     let main_fs = match main_fs {
         Some(fs) => fs,

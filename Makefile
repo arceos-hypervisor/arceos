@@ -62,6 +62,7 @@ ACCEL ?=
 QEMU_ARGS ?=
 
 DISK_IMG ?= disk.img
+FS ?= fat32
 QEMU_LOG ?= n
 NET_DUMP ?= n
 NET_DEV ?= user
@@ -215,11 +216,8 @@ disk_img:
 ifneq ($(wildcard $(DISK_IMG)),)
 	@printf "$(YELLOW_C)warning$(END_C): disk image \"$(DISK_IMG)\" already exists!\n"
 else
-	$(call make_disk_image,fat32,$(DISK_IMG))
+	$(call make_disk_image,$(FS),$(DISK_IMG))
 endif
-
-ext4_img:
-	dd if=/dev/zero of=disk.img bs=1M count=32 && mkfs.ext4 disk.img
 
 clean: clean_c
 	rm -rf $(APP)/*.bin $(APP)/*.elf $(OUT_CONFIG)

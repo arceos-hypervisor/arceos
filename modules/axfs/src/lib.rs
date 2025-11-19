@@ -44,11 +44,14 @@ pub fn init_filesystems(mut blk_devs: AxDeviceContainer<AxBlockDevice>) {
     let dev = blk_devs.take_one().expect("No block device found!");
     info!("  use block device 0: {:?}", dev.device_name());
     let mut disk = self::dev::Disk::new(dev);
-    
+
     // Try to scan GPT partitions first
     match self::partition::scan_gpt_partitions(&mut disk) {
         Ok(partitions) if !partitions.is_empty() => {
-            info!("Found {} partitions, initializing with dynamic filesystem detection", partitions.len());
+            info!(
+                "Found {} partitions, initializing with dynamic filesystem detection",
+                partitions.len()
+            );
             // Check if any partition has a supported filesystem
             let has_supported_fs = partitions.iter().any(|p| p.filesystem_type.is_some());
             if has_supported_fs {
