@@ -87,7 +87,9 @@ impl fatfs::Seek for PartitionWrapper {
     }
 }
 
-pub struct FileWrapper<'a>(Mutex<File<'a, PartitionWrapper, NullTimeProvider, LossyOemCpConverter>>);
+pub struct FileWrapper<'a>(
+    Mutex<File<'a, PartitionWrapper, NullTimeProvider, LossyOemCpConverter>>,
+);
 pub struct DirWrapper<'a>(Dir<'a, PartitionWrapper, NullTimeProvider, LossyOemCpConverter>);
 
 unsafe impl Sync for FatFileSystem {}
@@ -138,7 +140,9 @@ impl FatFileSystem {
         // root_dir is already initialized in new(), so nothing to do here
     }
 
-    fn new_file(file: File<'_, PartitionWrapper, NullTimeProvider, LossyOemCpConverter>) -> VfsNodeRef {
+    fn new_file(
+        file: File<'_, PartitionWrapper, NullTimeProvider, LossyOemCpConverter>,
+    ) -> VfsNodeRef {
         // Use a Box to extend the lifetime of the file
         let file_box = Box::new(file);
         let file_static = unsafe {
@@ -151,7 +155,9 @@ impl FatFileSystem {
         Arc::new(file_wrapper) as VfsNodeRef
     }
 
-    fn new_dir(dir: Dir<'_, PartitionWrapper, NullTimeProvider, LossyOemCpConverter>) -> VfsNodeRef {
+    fn new_dir(
+        dir: Dir<'_, PartitionWrapper, NullTimeProvider, LossyOemCpConverter>,
+    ) -> VfsNodeRef {
         // Use a Box to extend the lifetime of the dir
         let dir_box = Box::new(dir);
         let dir_static = unsafe {

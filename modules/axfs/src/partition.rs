@@ -45,7 +45,7 @@ pub enum FilesystemType {
 /// GPT Header structure
 #[repr(C, packed)]
 struct GptHeader {
-    signature: [u8; 8],          // "EFI PART"
+    signature: [u8; 8], // "EFI PART"
     revision: [u8; 4],
     header_size: [u8; 4],
     header_crc32: [u8; 4],
@@ -160,13 +160,16 @@ fn parse_gpt_partitions(disk: &mut Disk) -> AxResult<Vec<PartitionInfo>> {
         size_of_partition_entry: header_data[84..88].try_into().unwrap(),
         partition_entry_array_crc32: header_data[88..92].try_into().unwrap(),
     };
-    
+
     let header_size = u32::from_le_bytes(header.header_size);
     let partition_entry_lba = u64::from_le_bytes(header.partition_entry_lba);
     let number_of_partition_entries = u32::from_le_bytes(header.number_of_partition_entries);
     let size_of_partition_entry = u32::from_le_bytes(header.size_of_partition_entry);
 
-    info!("GPT Header: {} entries at LBA {}", number_of_partition_entries, partition_entry_lba);
+    info!(
+        "GPT Header: {} entries at LBA {}",
+        number_of_partition_entries, partition_entry_lba
+    );
 
     // Read partition entries
     let partition_entry_offset = partition_entry_lba * 512;
@@ -180,7 +183,11 @@ fn parse_gpt_partitions(disk: &mut Disk) -> AxResult<Vec<PartitionInfo>> {
         }
 
         let entry = if size_of_partition_entry >= 128 {
-            unsafe { core::mem::transmute::<[u8; 128], GptPartitionEntry>(entry_data[..128].try_into().unwrap()) }
+            unsafe {
+                core::mem::transmute::<[u8; 128], GptPartitionEntry>(
+                    entry_data[..128].try_into().unwrap(),
+                )
+            }
         } else {
             continue;
         };
@@ -200,11 +207,7 @@ fn parse_gpt_partitions(disk: &mut Disk) -> AxResult<Vec<PartitionInfo>> {
         let entry_ptr = &entry as *const GptPartitionEntry as *const u8;
         let name_ptr = unsafe { entry_ptr.add(56) } as *const u16;
         unsafe {
-            core::ptr::copy_nonoverlapping(
-                name_ptr,
-                name_utf16.as_mut_ptr(),
-                36
-            );
+            core::ptr::copy_nonoverlapping(name_ptr, name_utf16.as_mut_ptr(), 36);
         }
         let name_str = String::from_utf16_lossy(&name_utf16)
             .trim_end_matches('\0')
@@ -414,11 +417,8 @@ pub fn create_filesystem_for_partition(
         Some(FilesystemType::Fat) => {
             info!("Creating FAT filesystem for partition '{}'", partition.name);
             // Create a partition wrapper
-            let partition_wrapper = crate::dev::Partition::new(
-                disk,
-                partition.starting_lba,
-                partition.ending_lba,
-            );
+            let partition_wrapper =
+                crate::dev::Partition::new(disk, partition.starting_lba, partition.ending_lba);
             let fs = crate::fs::fatfs::FatFileSystem::from_partition(partition_wrapper);
             Ok(Arc::new(fs))
         }
@@ -428,11 +428,8 @@ pub fn create_filesystem_for_partition(
                 partition.name
             );
             // Create a partition wrapper
-            let partition_wrapper = crate::dev::Partition::new(
-                disk,
-                partition.starting_lba,
-                partition.ending_lba,
-            );
+            let partition_wrapper =
+                crate::dev::Partition::new(disk, partition.starting_lba, partition.ending_lba);
             let fs = crate::fs::ext4fs::Ext4FileSystem::from_partition(partition_wrapper);
             Ok(Arc::new(fs))
         }

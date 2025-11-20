@@ -59,8 +59,8 @@ impl Ext4FileSystem {
             partition.size(),
             partition.position()
         );
-        let inner =
-            Ext4BlockWrapper::<Partition>::new(partition).expect("failed to initialize EXT4 filesystem on partition");
+        let inner = Ext4BlockWrapper::<Partition>::new(partition)
+            .expect("failed to initialize EXT4 filesystem on partition");
         let root = Arc::new(FileWrapper::new("/", InodeTypes::EXT4_DE_DIR));
         Ext4FileSystemPartition { inner, root }
     }

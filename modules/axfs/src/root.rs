@@ -217,17 +217,27 @@ pub(crate) fn init_rootfs_with_partitions(
                 Ok(fs) => {
                     // Create a static mount path string using sda1, sda2, etc.
                     let mount_path = format!("/mnt/sda{}", i);
-                    info!("Mounting partition '{}' at '{}'", partition.name, mount_path);
-                    
+                    info!(
+                        "Mounting partition '{}' at '{}'",
+                        partition.name, mount_path
+                    );
+
                     // Create the mount point directory in the root filesystem
-                    if let Err(e) = root_dir.main_fs.root_dir().create(&mount_path, FileType::Dir) {
+                    if let Err(e) = root_dir
+                        .main_fs
+                        .root_dir()
+                        .create(&mount_path, FileType::Dir)
+                    {
                         warn!("Failed to create mount point '{}': {:?}", mount_path, e);
                         continue;
                     }
-                    
+
                     // Mount the filesystem
                     if let Err(e) = root_dir.mount(&mount_path, fs) {
-                        warn!("Failed to mount partition '{}' at '{}': {:?}", partition.name, mount_path, e);
+                        warn!(
+                            "Failed to mount partition '{}' at '{}': {:?}",
+                            partition.name, mount_path, e
+                        );
                     }
                 }
                 Err(e) => {

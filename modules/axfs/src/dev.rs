@@ -58,15 +58,16 @@ impl Disk {
             BLOCK_SIZE
         } else {
             // partial block
-        let mut data = [0u8; BLOCK_SIZE];
-        let start = self.offset;
-        let count = buf.len().min(BLOCK_SIZE - self.offset);
+            let mut data = [0u8; BLOCK_SIZE];
+            let start = self.offset;
+            let count = buf.len().min(BLOCK_SIZE - self.offset);
 
-        {
-            let mut dev = self.dev.lock();
-            dev.read_block(self.block_id, &mut data)?;
-        }
-        buf[..count].copy_from_slice(&data[start..start + count]);            self.offset += count;
+            {
+                let mut dev = self.dev.lock();
+                dev.read_block(self.block_id, &mut data)?;
+            }
+            buf[..count].copy_from_slice(&data[start..start + count]);
+            self.offset += count;
             if self.offset >= BLOCK_SIZE {
                 self.block_id += 1;
                 self.offset -= BLOCK_SIZE;
@@ -144,14 +145,14 @@ impl Partition {
 
         // Calculate the absolute position on the disk
         let abs_pos = self.start_lba * BLOCK_SIZE as u64 + self.position;
-        
+
         // Set disk position and read
         let read_len = {
             let mut disk = self.disk.lock();
             disk.set_position(abs_pos);
             disk.read_one(buf)?
         };
-        
+
         self.position += read_len as u64;
         Ok(read_len)
     }
@@ -168,14 +169,14 @@ impl Partition {
 
         // Calculate the absolute position on the disk
         let abs_pos = self.start_lba * BLOCK_SIZE as u64 + self.position;
-        
+
         // Set disk position and write
         let write_len = {
             let mut disk = self.disk.lock();
             disk.set_position(abs_pos);
             disk.write_one(buf)?
         };
-        
+
         self.position += write_len as u64;
         Ok(write_len)
     }
