@@ -3,7 +3,7 @@
 //! This module provides functionality to scan GPT partition tables and detect
 //! filesystem types on each partition.
 
-use alloc::{string::String, sync::Arc, vec, vec::Vec};
+use alloc::{borrow::ToOwned, format, string::String, sync::Arc, vec, vec::Vec};
 use axerrno::{AxResult, ax_err};
 use axfs_vfs::VfsOps;
 use log::{debug, info, warn};
@@ -42,21 +42,77 @@ pub enum FilesystemType {
     Unknown,
 }
 
-/// Simple GPT partition scanner
+/// GPT Header structure
+#[repr(C, packed)]
+struct GptHeader {
+    signature: [u8; 8],          // "EFI PART"
+    revision: [u8; 4],
+    header_size: [u8; 4],
+    header_crc32: [u8; 4],
+    reserved: [u8; 4],
+    current_lba: [u8; 8],
+    backup_lba: [u8; 8],
+    first_usable_lba: [u8; 8],
+    last_usable_lba: [u8; 8],
+    disk_guid: [u8; 16],
+    partition_entry_lba: [u8; 8],
+    number_of_partition_entries: [u8; 4],
+    size_of_partition_entry: [u8; 4],
+    partition_entry_array_crc32: [u8; 4],
+}
+
+/// GPT Partition Entry structure
+#[repr(C, packed)]
+struct GptPartitionEntry {
+    partition_type_guid: [u8; 16],
+    unique_partition_guid: [u8; 16],
+    starting_lba: [u8; 8],
+    ending_lba: [u8; 8],
+    attributes: [u8; 8],
+    partition_name: [u16; 36], // UTF-16LE
+}
+
+/// GPT partition scanner
 pub fn scan_gpt_partitions(disk: &mut Disk) -> AxResult<Vec<PartitionInfo>> {
-    info!("Scanning for partitions (simplified implementation)...");
+    info!("Scanning for GPT partitions...");
 
-    // For now, return a single partition covering the whole disk
-    // This is a simplified implementation that doesn't actually parse GPT
     let disk_size = disk.size();
-
     if disk_size == 0 {
         return Ok(Vec::new());
     }
 
-    // Try to detect filesystem on the whole disk
-    let filesystem_type = detect_filesystem_type(disk, 0);
+    // First, try to parse GPT partition table
+    match parse_gpt_partitions(disk) {
+        Ok(partitions) if !partitions.is_empty() => {
+            info!("Found {} GPT partitions", partitions.len());
+            return Ok(partitions);
+        }
+        Ok(_) => {
+            info!("No GPT partitions found, trying MBR...");
+        }
+        Err(e) => {
+            warn!("Failed to parse GPT: {:?}", e);
+            info!("Trying MBR...");
+        }
+    }
 
+    // If GPT parsing fails, try MBR
+    match parse_mbr_partitions(disk) {
+        Ok(partitions) if !partitions.is_empty() => {
+            info!("Found {} MBR partitions", partitions.len());
+            return Ok(partitions);
+        }
+        Ok(_) => {
+            info!("No MBR partitions found");
+        }
+        Err(e) => {
+            warn!("Failed to parse MBR: {:?}", e);
+        }
+    }
+
+    // If both GPT and MBR fail, treat the whole disk as a single partition
+    warn!("No partition table found, treating whole disk as single partition");
+    let filesystem_type = detect_filesystem_type(disk, 0);
     let partition = PartitionInfo {
         index: 0,
         name: String::from("disk"),
@@ -68,12 +124,175 @@ pub fn scan_gpt_partitions(disk: &mut Disk) -> AxResult<Vec<PartitionInfo>> {
         filesystem_type,
     };
 
-    info!(
-        "Found disk: '{}' ({} bytes) with filesystem: {:?}",
-        partition.name, partition.size_bytes, partition.filesystem_type
-    );
-
     Ok(vec![partition])
+}
+
+/// Parse GPT partition table
+fn parse_gpt_partitions(disk: &mut Disk) -> AxResult<Vec<PartitionInfo>> {
+    let mut partitions = Vec::new();
+
+    // Read GPT Header from LBA 1
+    let mut header_data = [0u8; 512];
+    disk.set_position(512); // LBA 1
+    if read_exact(disk, &mut header_data).is_err() {
+        return ax_err!(InvalidData, "Failed to read GPT header");
+    }
+
+    // Check GPT signature
+    if &header_data[0..8] != b"EFI PART" {
+        return ax_err!(InvalidData, "Invalid GPT signature");
+    }
+
+    // Parse GPT header manually to avoid size mismatch
+    let header = GptHeader {
+        signature: header_data[0..8].try_into().unwrap(),
+        revision: header_data[8..12].try_into().unwrap(),
+        header_size: header_data[12..16].try_into().unwrap(),
+        header_crc32: header_data[16..20].try_into().unwrap(),
+        reserved: header_data[20..24].try_into().unwrap(),
+        current_lba: header_data[24..32].try_into().unwrap(),
+        backup_lba: header_data[32..40].try_into().unwrap(),
+        first_usable_lba: header_data[40..48].try_into().unwrap(),
+        last_usable_lba: header_data[48..56].try_into().unwrap(),
+        disk_guid: header_data[56..72].try_into().unwrap(),
+        partition_entry_lba: header_data[72..80].try_into().unwrap(),
+        number_of_partition_entries: header_data[80..84].try_into().unwrap(),
+        size_of_partition_entry: header_data[84..88].try_into().unwrap(),
+        partition_entry_array_crc32: header_data[88..92].try_into().unwrap(),
+    };
+    
+    let header_size = u32::from_le_bytes(header.header_size);
+    let partition_entry_lba = u64::from_le_bytes(header.partition_entry_lba);
+    let number_of_partition_entries = u32::from_le_bytes(header.number_of_partition_entries);
+    let size_of_partition_entry = u32::from_le_bytes(header.size_of_partition_entry);
+
+    info!("GPT Header: {} entries at LBA {}", number_of_partition_entries, partition_entry_lba);
+
+    // Read partition entries
+    let partition_entry_offset = partition_entry_lba * 512;
+    disk.set_position(partition_entry_offset);
+
+    for i in 0..number_of_partition_entries {
+        let mut entry_data = vec![0u8; size_of_partition_entry as usize];
+        if read_exact(disk, &mut entry_data).is_err() {
+            warn!("Failed to read partition entry {}", i);
+            continue;
+        }
+
+        let entry = if size_of_partition_entry >= 128 {
+            unsafe { core::mem::transmute::<[u8; 128], GptPartitionEntry>(entry_data[..128].try_into().unwrap()) }
+        } else {
+            continue;
+        };
+
+        // Check if partition is in use (all zeros means unused)
+        if entry.partition_type_guid.iter().all(|&b| b == 0) {
+            continue;
+        }
+
+        let starting_lba = u64::from_le_bytes(entry.starting_lba);
+        let ending_lba = u64::from_le_bytes(entry.ending_lba);
+        let size_bytes = (ending_lba - starting_lba + 1) * 512;
+
+        // Convert partition name from UTF-16LE to UTF-8
+        // Copy the packed field to avoid unaligned reference
+        let mut name_utf16 = [0u16; 36];
+        let entry_ptr = &entry as *const GptPartitionEntry as *const u8;
+        let name_ptr = unsafe { entry_ptr.add(56) } as *const u16;
+        unsafe {
+            core::ptr::copy_nonoverlapping(
+                name_ptr,
+                name_utf16.as_mut_ptr(),
+                36
+            );
+        }
+        let name_str = String::from_utf16_lossy(&name_utf16)
+            .trim_end_matches('\0')
+            .to_owned();
+
+        if name_str.is_empty() {
+            continue;
+        }
+
+        // Detect filesystem type
+        let filesystem_type = detect_filesystem_type(disk, starting_lba);
+
+        let partition = PartitionInfo {
+            index: i as u32,
+            name: name_str,
+            partition_type_guid: entry.partition_type_guid,
+            unique_partition_guid: entry.unique_partition_guid,
+            starting_lba,
+            ending_lba,
+            size_bytes,
+            filesystem_type,
+        };
+
+        info!(
+            "Found GPT partition {}: '{}' ({} bytes) with filesystem: {:?}",
+            partition.index, partition.name, partition.size_bytes, partition.filesystem_type
+        );
+
+        partitions.push(partition);
+    }
+
+    Ok(partitions)
+}
+
+/// Parse MBR partition table
+fn parse_mbr_partitions(disk: &mut Disk) -> AxResult<Vec<PartitionInfo>> {
+    let mut partitions = Vec::new();
+
+    // Read MBR from LBA 0
+    let mut mbr_data = [0u8; 512];
+    disk.set_position(0);
+    if read_exact(disk, &mut mbr_data).is_err() {
+        return ax_err!(InvalidData, "Failed to read MBR");
+    }
+
+    // Check for valid MBR signature
+    if mbr_data[510] != 0x55 || mbr_data[511] != 0xAA {
+        return ax_err!(InvalidData, "Invalid MBR signature");
+    }
+
+    // Parse partition entries (4 entries at offset 0x1BE)
+    for i in 0..4 {
+        let entry_offset = 0x1BE + i * 16;
+        let entry = &mbr_data[entry_offset..entry_offset + 16];
+
+        // Check if partition is active (non-zero type)
+        if entry[4] == 0 {
+            continue;
+        }
+
+        let starting_lba = u32::from_le_bytes([entry[8], entry[9], entry[10], entry[11]]) as u64;
+        let size_sectors = u32::from_le_bytes([entry[12], entry[13], entry[14], entry[15]]) as u64;
+        let ending_lba = starting_lba + size_sectors - 1;
+        let size_bytes = size_sectors * 512;
+
+        // Detect filesystem type
+        let filesystem_type = detect_filesystem_type(disk, starting_lba);
+
+        let partition = PartitionInfo {
+            index: i as u32,
+            name: format!("mbr{}", i + 1),
+            partition_type_guid: [0; 16],
+            unique_partition_guid: [0; 16],
+            starting_lba,
+            ending_lba,
+            size_bytes,
+            filesystem_type,
+        };
+
+        info!(
+            "Found MBR partition {}: '{}' ({} bytes) with filesystem: {:?}",
+            partition.index, partition.name, partition.size_bytes, partition.filesystem_type
+        );
+
+        partitions.push(partition);
+    }
+
+    Ok(partitions)
 }
 
 /// Detect filesystem type on a partition
@@ -194,9 +413,13 @@ pub fn create_filesystem_for_partition(
     match partition.filesystem_type {
         Some(FilesystemType::Fat) => {
             info!("Creating FAT filesystem for partition '{}'", partition.name);
-            // Use the whole disk for now
-
-            let fs = crate::fs::fatfs::FatFileSystem::new(disk);
+            // Create a partition wrapper
+            let partition_wrapper = crate::dev::Partition::new(
+                disk,
+                partition.starting_lba,
+                partition.ending_lba,
+            );
+            let fs = crate::fs::fatfs::FatFileSystem::from_partition(partition_wrapper);
             Ok(Arc::new(fs))
         }
         Some(FilesystemType::Ext4) => {
@@ -204,8 +427,13 @@ pub fn create_filesystem_for_partition(
                 "Creating ext4 filesystem for partition '{}'",
                 partition.name
             );
-            // Use the whole disk for now
-            let fs = crate::fs::ext4fs::Ext4FileSystem::new(disk);
+            // Create a partition wrapper
+            let partition_wrapper = crate::dev::Partition::new(
+                disk,
+                partition.starting_lba,
+                partition.ending_lba,
+            );
+            let fs = crate::fs::ext4fs::Ext4FileSystem::from_partition(partition_wrapper);
             Ok(Arc::new(fs))
         }
         Some(FilesystemType::Unknown) | None => {

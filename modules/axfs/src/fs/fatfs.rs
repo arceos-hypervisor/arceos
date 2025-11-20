@@ -7,17 +7,88 @@ use axfs_vfs::{VfsNodeAttr, VfsNodeOps, VfsNodeRef, VfsNodeType, VfsOps};
 use axsync::Mutex;
 use fatfs::{Dir, File, LossyOemCpConverter, NullTimeProvider, Read, Seek, SeekFrom, Write};
 
-use crate::dev::Disk;
+use crate::dev::{Disk, Partition};
 
 const BLOCK_SIZE: usize = 512;
 
 pub struct FatFileSystem {
-    inner: fatfs::FileSystem<Disk, NullTimeProvider, LossyOemCpConverter>,
+    inner: fatfs::FileSystem<PartitionWrapper, NullTimeProvider, LossyOemCpConverter>,
     root_dir: OnceCell<VfsNodeRef>,
 }
 
-pub struct FileWrapper<'a>(Mutex<File<'a, Disk, NullTimeProvider, LossyOemCpConverter>>);
-pub struct DirWrapper<'a>(Dir<'a, Disk, NullTimeProvider, LossyOemCpConverter>);
+/// A wrapper for Partition to implement the required traits for fatfs
+pub struct PartitionWrapper {
+    partition: Partition,
+}
+
+impl PartitionWrapper {
+    pub fn new(partition: Partition) -> Self {
+        Self { partition }
+    }
+}
+
+impl fatfs::IoBase for PartitionWrapper {
+    type Error = ();
+}
+
+impl fatfs::Read for PartitionWrapper {
+    fn read(&mut self, mut buf: &mut [u8]) -> Result<usize, Self::Error> {
+        let mut read_len = 0;
+        while !buf.is_empty() {
+            match self.partition.read_one(buf) {
+                Ok(0) => break,
+                Ok(n) => {
+                    let tmp = buf;
+                    buf = &mut tmp[n..];
+                    read_len += n;
+                }
+                Err(_) => return Err(()),
+            }
+        }
+        Ok(read_len)
+    }
+}
+
+impl fatfs::Write for PartitionWrapper {
+    fn write(&mut self, mut buf: &[u8]) -> Result<usize, Self::Error> {
+        let mut write_len = 0;
+        while !buf.is_empty() {
+            match self.partition.write_one(buf) {
+                Ok(0) => break,
+                Ok(n) => {
+                    buf = &buf[n..];
+                    write_len += n;
+                }
+                Err(_) => return Err(()),
+            }
+        }
+        Ok(write_len)
+    }
+
+    fn flush(&mut self) -> Result<(), Self::Error> {
+        Ok(())
+    }
+}
+
+impl fatfs::Seek for PartitionWrapper {
+    fn seek(&mut self, pos: fatfs::SeekFrom) -> Result<u64, Self::Error> {
+        let size = self.partition.size();
+        let new_pos = match pos {
+            fatfs::SeekFrom::Start(pos) => Some(pos),
+            fatfs::SeekFrom::Current(off) => self.partition.position().checked_add_signed(off),
+            fatfs::SeekFrom::End(off) => size.checked_add_signed(off),
+        }
+        .ok_or(())?;
+        if new_pos > size {
+            warn!("Seek beyond the end of the partition");
+        }
+        self.partition.set_position(new_pos);
+        Ok(new_pos)
+    }
+}
+
+pub struct FileWrapper<'a>(Mutex<File<'a, PartitionWrapper, NullTimeProvider, LossyOemCpConverter>>);
+pub struct DirWrapper<'a>(Dir<'a, PartitionWrapper, NullTimeProvider, LossyOemCpConverter>);
 
 unsafe impl Sync for FatFileSystem {}
 unsafe impl Send for FatFileSystem {}
@@ -42,8 +113,21 @@ impl FatFileSystem {
 
     #[cfg(not(feature = "use-ramdisk"))]
     pub fn new(disk: Disk) -> Self {
-        let inner = fatfs::FileSystem::new(disk, fatfs::FsOptions::new())
+        let disk_size = disk.size();
+        let wrapper = PartitionWrapper::new(crate::dev::Partition::new(disk, 0, disk_size / 512));
+        let inner = fatfs::FileSystem::new(wrapper, fatfs::FsOptions::new())
             .expect("failed to initialize FAT filesystem");
+        Self {
+            inner,
+            root_dir: OnceCell::new(),
+        }
+    }
+
+    /// Create a new FAT filesystem from a partition
+    pub fn from_partition(partition: Partition) -> Self {
+        let wrapper = PartitionWrapper::new(partition);
+        let inner = fatfs::FileSystem::new(wrapper, fatfs::FsOptions::new())
+            .expect("failed to initialize FAT filesystem on partition");
         Self {
             inner,
             root_dir: OnceCell::new(),
@@ -54,26 +138,26 @@ impl FatFileSystem {
         // root_dir is already initialized in new(), so nothing to do here
     }
 
-    fn new_file(file: File<'_, Disk, NullTimeProvider, LossyOemCpConverter>) -> VfsNodeRef {
+    fn new_file(file: File<'_, PartitionWrapper, NullTimeProvider, LossyOemCpConverter>) -> VfsNodeRef {
         // Use a Box to extend the lifetime of the file
         let file_box = Box::new(file);
         let file_static = unsafe {
             core::mem::transmute::<
-                Box<File<'_, Disk, NullTimeProvider, LossyOemCpConverter>>,
-                Box<File<'static, Disk, NullTimeProvider, LossyOemCpConverter>>,
+                Box<File<'_, PartitionWrapper, NullTimeProvider, LossyOemCpConverter>>,
+                Box<File<'static, PartitionWrapper, NullTimeProvider, LossyOemCpConverter>>,
             >(file_box)
         };
         let file_wrapper = FileWrapper(Mutex::new(*file_static));
         Arc::new(file_wrapper) as VfsNodeRef
     }
 
-    fn new_dir(dir: Dir<'_, Disk, NullTimeProvider, LossyOemCpConverter>) -> VfsNodeRef {
+    fn new_dir(dir: Dir<'_, PartitionWrapper, NullTimeProvider, LossyOemCpConverter>) -> VfsNodeRef {
         // Use a Box to extend the lifetime of the dir
         let dir_box = Box::new(dir);
         let dir_static = unsafe {
             core::mem::transmute::<
-                Box<Dir<'_, Disk, NullTimeProvider, LossyOemCpConverter>>,
-                Box<Dir<'static, Disk, NullTimeProvider, LossyOemCpConverter>>,
+                Box<Dir<'_, PartitionWrapper, NullTimeProvider, LossyOemCpConverter>>,
+                Box<Dir<'static, PartitionWrapper, NullTimeProvider, LossyOemCpConverter>>,
             >(dir_box)
         };
         let dir_wrapper = DirWrapper(*dir_static);

@@ -35,6 +35,7 @@ mod root;
 pub mod api;
 pub mod fops;
 
+use alloc::sync::Arc;
 use axdriver::{AxDeviceContainer, prelude::*};
 
 /// Initializes filesystems by block devices.
@@ -56,7 +57,8 @@ pub fn init_filesystems(mut blk_devs: AxDeviceContainer<AxBlockDevice>) {
             let has_supported_fs = partitions.iter().any(|p| p.filesystem_type.is_some());
             if has_supported_fs {
                 // Try to initialize with partitions
-                if !self::root::init_rootfs_with_partitions(disk, partitions) {
+                let disk_arc = Arc::new(disk);
+                if !self::root::init_rootfs_with_partitions(disk_arc, partitions) {
                     warn!("Failed to initialize with partitions.");
                 }
             } else {

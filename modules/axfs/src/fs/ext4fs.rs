@@ -12,7 +12,7 @@ use lwext4_rust::bindings::{
 };
 use lwext4_rust::{Ext4BlockWrapper, Ext4File, InodeTypes, KernelDevOp};
 
-use crate::dev::Disk;
+use crate::dev::{Disk, Partition};
 pub const BLOCK_SIZE: usize = 512;
 
 #[allow(dead_code)]
@@ -21,8 +21,17 @@ pub struct Ext4FileSystem {
     root: VfsNodeRef,
 }
 
+/// Ext4FileSystem that works with a partition
+pub struct Ext4FileSystemPartition {
+    inner: Ext4BlockWrapper<Partition>,
+    root: VfsNodeRef,
+}
+
 unsafe impl Sync for Ext4FileSystem {}
 unsafe impl Send for Ext4FileSystem {}
+
+unsafe impl Sync for Ext4FileSystemPartition {}
+unsafe impl Send for Ext4FileSystemPartition {}
 
 impl Ext4FileSystem {
     #[cfg(feature = "use-ramdisk")]
@@ -42,10 +51,31 @@ impl Ext4FileSystem {
         let root = Arc::new(FileWrapper::new("/", InodeTypes::EXT4_DE_DIR));
         Self { inner, root }
     }
+
+    /// Create a new ext4 filesystem from a partition
+    pub fn from_partition(partition: Partition) -> Ext4FileSystemPartition {
+        info!(
+            "Got Partition size:{}, position:{}",
+            partition.size(),
+            partition.position()
+        );
+        let inner =
+            Ext4BlockWrapper::<Partition>::new(partition).expect("failed to initialize EXT4 filesystem on partition");
+        let root = Arc::new(FileWrapper::new("/", InodeTypes::EXT4_DE_DIR));
+        Ext4FileSystemPartition { inner, root }
+    }
 }
 
 /// The [`VfsOps`] trait provides operations on a filesystem.
 impl VfsOps for Ext4FileSystem {
+    fn root_dir(&self) -> VfsNodeRef {
+        debug!("Get root_dir");
+        Arc::clone(&self.root)
+    }
+}
+
+/// The [`VfsOps`] trait provides operations on a filesystem.
+impl VfsOps for Ext4FileSystemPartition {
     fn root_dir(&self) -> VfsNodeRef {
         debug!("Get root_dir");
         Arc::clone(&self.root)
@@ -370,6 +400,75 @@ impl KernelDevOp for Disk {
         .ok_or(DevError::Io as i32)?;
         if new_pos as u64 > size {
             warn!("Seek beyond the end of the block device");
+        }
+        dev.set_position(new_pos as u64);
+        Ok(new_pos)
+    }
+}
+
+impl KernelDevOp for Partition {
+    type DevType = Partition;
+
+    fn read(dev: &mut Partition, mut buf: &mut [u8]) -> Result<usize, i32> {
+        trace!("READ partition buf={}", buf.len());
+        let mut read_len = 0;
+        while !buf.is_empty() {
+            match dev.read_one(buf) {
+                Ok(0) => break,
+                Ok(n) => {
+                    buf = &mut buf[n..];
+                    read_len += n;
+                }
+                Err(_) => return Err(DevError::Io as i32),
+            }
+        }
+        trace!("READ rt len={}", read_len);
+        Ok(read_len)
+    }
+
+    fn write(dev: &mut Self::DevType, mut buf: &[u8]) -> Result<usize, i32> {
+        trace!("WRITE partition buf={}", buf.len());
+        let mut write_len = 0;
+        while !buf.is_empty() {
+            match dev.write_one(buf) {
+                Ok(0) => break,
+                Ok(n) => {
+                    buf = &buf[n..];
+                    write_len += n;
+                }
+                Err(_e) => return Err(DevError::Io as i32),
+            }
+        }
+        trace!("WRITE rt len={}", write_len);
+        Ok(write_len)
+    }
+
+    fn flush(_dev: &mut Self::DevType) -> Result<usize, i32> {
+        debug!("uncomplicated");
+        Ok(0)
+    }
+
+    fn seek(dev: &mut Partition, off: i64, whence: i32) -> Result<i64, i32> {
+        let size = dev.size();
+        trace!(
+            "SEEK partition size:{}, pos:{}, offset={}, whence={}",
+            size,
+            &dev.position(),
+            off,
+            whence
+        );
+        let new_pos = match whence as u32 {
+            SEEK_SET => Some(off),
+            SEEK_CUR => dev.position().checked_add_signed(off).map(|v| v as i64),
+            SEEK_END => size.checked_add_signed(off).map(|v| v as i64),
+            _ => {
+                error!("invalid seek() whence: {}", whence);
+                Some(off)
+            }
+        }
+        .ok_or(DevError::Io as i32)?;
+        if new_pos as u64 > size {
+            warn!("Seek beyond the end of the partition");
         }
         dev.set_position(new_pos as u64);
         Ok(new_pos)

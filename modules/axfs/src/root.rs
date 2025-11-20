@@ -2,7 +2,7 @@
 //!
 //! TODO: it doesn't work very well if the mount points have containment relationships.
 
-use alloc::{string::String, sync::Arc, vec::Vec};
+use alloc::{borrow::ToOwned, format, string::String, sync::Arc, vec::Vec};
 use axerrno::{AxError, AxResult, ax_err};
 use axfs_vfs::{VfsNodeAttr, VfsNodeOps, VfsNodeRef, VfsNodeType, VfsOps, VfsResult};
 use axns::{ResArc, def_resource};
@@ -21,7 +21,7 @@ def_resource! {
 }
 
 struct MountPoint {
-    path: &'static str,
+    path: String,
     fs: Arc<dyn VfsOps>,
 }
 
@@ -33,7 +33,7 @@ struct RootDirectory {
 static ROOT_DIR: LazyInit<Arc<RootDirectory>> = LazyInit::new();
 
 impl MountPoint {
-    pub fn new(path: &'static str, fs: Arc<dyn VfsOps>) -> Self {
+    pub fn new(path: String, fs: Arc<dyn VfsOps>) -> Self {
         Self { path, fs }
     }
 }
@@ -52,7 +52,7 @@ impl RootDirectory {
         }
     }
 
-    pub fn mount(&mut self, path: &'static str, fs: Arc<dyn VfsOps>) -> AxResult {
+    pub fn mount(&mut self, path: &str, fs: Arc<dyn VfsOps>) -> AxResult {
         if path == "/" {
             return ax_err!(InvalidInput, "cannot mount root filesystem");
         }
@@ -65,7 +65,7 @@ impl RootDirectory {
         // create the mount point in the main filesystem if it does not exist
         self.main_fs.root_dir().create(path, FileType::Dir)?;
         fs.mount(path, self.main_fs.root_dir().lookup(path)?)?;
-        self.mounts.push(MountPoint::new(path, fs));
+        self.mounts.push(MountPoint::new(path.to_owned(), fs));
         Ok(())
     }
 
@@ -152,7 +152,7 @@ impl VfsNodeOps for RootDirectory {
 
 /// Initialize root filesystem with dynamic partition detection
 pub(crate) fn init_rootfs_with_partitions(
-    disk: crate::dev::Disk,
+    disk: Arc<crate::dev::Disk>,
     partitions: Vec<PartitionInfo>,
 ) -> bool {
     info!(
@@ -162,26 +162,28 @@ pub(crate) fn init_rootfs_with_partitions(
 
     // Find the first partition with a supported filesystem as the root
     let mut main_fs = None;
-    let mut _root_partition_index = None;
+    let mut root_partition_index = None;
 
-    // For now, just use the first partition
-    // This is a limitation of the current implementation
-    if let Some(partition) = partitions.first() {
-        match create_filesystem_for_partition(disk, partition) {
-            Ok(fs) => {
-                info!(
-                    "Using partition '{}' ({:?}) as root filesystem",
-                    partition.name,
-                    partition.filesystem_type.unwrap_or(FilesystemType::Unknown)
-                );
-                main_fs = Some(fs);
-                _root_partition_index = Some(0);
-            }
-            Err(e) => {
-                warn!(
-                    "Failed to create filesystem for partition '{}': {:?}",
-                    partition.name, e
-                );
+    // Find the first partition with a supported filesystem
+    for (i, partition) in partitions.iter().enumerate() {
+        if partition.filesystem_type.is_some() {
+            match create_filesystem_for_partition((*disk).clone(), partition) {
+                Ok(fs) => {
+                    info!(
+                        "Using partition '{}' ({:?}) as root filesystem",
+                        partition.name,
+                        partition.filesystem_type.unwrap_or(FilesystemType::Unknown)
+                    );
+                    main_fs = Some(fs);
+                    root_partition_index = Some(i);
+                    break;
+                }
+                Err(e) => {
+                    warn!(
+                        "Failed to create filesystem for partition '{}': {:?}",
+                        partition.name, e
+                    );
+                }
             }
         }
     }
@@ -196,6 +198,47 @@ pub(crate) fn init_rootfs_with_partitions(
     };
 
     let mut root_dir = RootDirectory::new(main_fs);
+
+    // Create /mnt directory first if it doesn't exist
+    if let Err(e) = root_dir.main_fs.root_dir().create("/mnt", FileType::Dir) {
+        warn!("Failed to create /mnt directory: {:?}", e);
+    }
+
+    // Mount additional partitions
+    for (i, partition) in partitions.iter().enumerate() {
+        // Skip the root partition
+        if Some(i) == root_partition_index {
+            continue;
+        }
+
+        // Only mount partitions with supported filesystems
+        if partition.filesystem_type.is_some() {
+            match create_filesystem_for_partition((*disk).clone(), partition) {
+                Ok(fs) => {
+                    // Create a static mount path string using sda1, sda2, etc.
+                    let mount_path = format!("/mnt/sda{}", i);
+                    info!("Mounting partition '{}' at '{}'", partition.name, mount_path);
+                    
+                    // Create the mount point directory in the root filesystem
+                    if let Err(e) = root_dir.main_fs.root_dir().create(&mount_path, FileType::Dir) {
+                        warn!("Failed to create mount point '{}': {:?}", mount_path, e);
+                        continue;
+                    }
+                    
+                    // Mount the filesystem
+                    if let Err(e) = root_dir.mount(&mount_path, fs) {
+                        warn!("Failed to mount partition '{}' at '{}': {:?}", partition.name, mount_path, e);
+                    }
+                }
+                Err(e) => {
+                    warn!(
+                        "Failed to create filesystem for partition '{}': {:?}",
+                        partition.name, e
+                    );
+                }
+            }
+        }
+    }
 
     root_dir
         .mount("/dev", mounts::devfs())
