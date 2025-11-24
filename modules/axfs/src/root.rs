@@ -25,7 +25,7 @@ struct MountPoint {
     fs: Arc<dyn VfsOps>,
 }
 
-struct RootDirectory {
+pub struct RootDirectory {
     main_fs: Arc<dyn VfsOps>,
     mounts: Vec<MountPoint>,
 }
@@ -150,6 +150,13 @@ impl VfsNodeOps for RootDirectory {
     }
 }
 
+pub(crate) fn init_rootfs_with_ramfs() {
+    info!("Initializing root filesystem with ramfs");
+    let main_fs = mounts::ramfs();
+    let root_dir = RootDirectory::new(main_fs);
+    mounted_on_root_dir(root_dir);
+}
+
 /// Initialize root filesystem with dynamic partition detection
 pub(crate) fn init_rootfs_with_partitions(
     disk: Arc<crate::dev::Disk>,
@@ -192,16 +199,16 @@ pub(crate) fn init_rootfs_with_partitions(
     let main_fs = match main_fs {
         Some(fs) => fs,
         None => {
-            warn!("No supported filesystem found in partitions");
-            return false;
+            warn!("No supported filesystem found in partitions, mount ramfs as rootfs");
+            mounts::ramfs()
         }
     };
 
     let mut root_dir = RootDirectory::new(main_fs);
 
-    // Create /mnt directory first if it doesn't exist
-    if let Err(e) = root_dir.main_fs.root_dir().create("/mnt", FileType::Dir) {
-        warn!("Failed to create /mnt directory: {:?}", e);
+    // Create /boot directory first if it doesn't exist
+    if let Err(e) = root_dir.main_fs.root_dir().create("/boot", FileType::Dir) {
+        warn!("Failed to create /boot directory: {:?}", e);
     }
 
     // Mount additional partitions
@@ -216,7 +223,7 @@ pub(crate) fn init_rootfs_with_partitions(
             match create_filesystem_for_partition((*disk).clone(), partition) {
                 Ok(fs) => {
                     // Create a static mount path string using sda1, sda2, etc.
-                    let mount_path = format!("/mnt/sda{}", i);
+                    let mount_path = format!("/boot/sda{}", i);
                     info!(
                         "Mounting partition '{}' at '{}'",
                         partition.name, mount_path
@@ -250,14 +257,14 @@ pub(crate) fn init_rootfs_with_partitions(
         }
     }
 
+    mounted_on_root_dir(root_dir);
+    true
+}
+
+pub fn mounted_on_root_dir(mut root_dir: RootDirectory) {
     root_dir
         .mount("/dev", mounts::devfs())
         .expect("failed to mount devfs at /dev");
-
-    // Mount a ramfs at /tmp
-    root_dir
-        .mount("/tmp", mounts::ramfs())
-        .expect("failed to mount ramfs at /tmp");
 
     // Mount another ramfs as procfs
     root_dir // should not fail
@@ -272,7 +279,6 @@ pub(crate) fn init_rootfs_with_partitions(
     ROOT_DIR.init_once(Arc::new(root_dir));
     CURRENT_DIR.init_new(Mutex::new(ROOT_DIR.clone()));
     CURRENT_DIR_PATH.init_new(Mutex::new(String::from("/")));
-    true
 }
 
 fn parent_node_of(dir: Option<&VfsNodeRef>, path: &str) -> VfsNodeRef {

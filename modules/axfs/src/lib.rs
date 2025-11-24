@@ -66,7 +66,8 @@ pub fn init_filesystems(mut blk_devs: AxDeviceContainer<AxBlockDevice>) {
             }
         }
         Ok(_) => {
-            warn!("No partitions found.");
+            warn!("No partitions found, mount ramfs as rootfs");
+            self::root::init_rootfs_with_ramfs();
         }
         Err(e) => {
             warn!("Failed to scan GPT partitions: {:?}", e);
