@@ -3,7 +3,6 @@ use axfs_vfs::{VfsNodeType, VfsOps, VfsResult};
 
 use crate::fs;
 
-#[cfg(feature = "devfs")]
 pub(crate) fn devfs() -> Arc<fs::devfs::DeviceFileSystem> {
     let null = fs::devfs::NullDev;
     let zero = fs::devfs::ZeroDev;
@@ -18,12 +17,10 @@ pub(crate) fn devfs() -> Arc<fs::devfs::DeviceFileSystem> {
     Arc::new(devfs)
 }
 
-#[cfg(feature = "ramfs")]
 pub(crate) fn ramfs() -> Arc<fs::ramfs::RamFileSystem> {
     Arc::new(fs::ramfs::RamFileSystem::new())
 }
 
-#[cfg(feature = "procfs")]
 pub(crate) fn procfs() -> VfsResult<Arc<fs::ramfs::RamFileSystem>> {
     let procfs = fs::ramfs::RamFileSystem::new();
     let proc_root = procfs.root_dir();
@@ -49,7 +46,6 @@ pub(crate) fn procfs() -> VfsResult<Arc<fs::ramfs::RamFileSystem>> {
     Ok(Arc::new(procfs))
 }
 
-#[cfg(feature = "sysfs")]
 pub(crate) fn sysfs() -> VfsResult<Arc<fs::ramfs::RamFileSystem>> {
     let sysfs = fs::ramfs::RamFileSystem::new();
     let sys_root = sysfs.root_dir();

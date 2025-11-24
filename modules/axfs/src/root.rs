@@ -254,19 +254,17 @@ pub(crate) fn init_rootfs_with_partitions(
         .mount("/dev", mounts::devfs())
         .expect("failed to mount devfs at /dev");
 
-    #[cfg(feature = "ramfs")]
+    // Mount a ramfs at /tmp
     root_dir
         .mount("/tmp", mounts::ramfs())
         .expect("failed to mount ramfs at /tmp");
 
     // Mount another ramfs as procfs
-    #[cfg(feature = "procfs")]
     root_dir // should not fail
         .mount("/proc", mounts::procfs().unwrap())
         .expect("fail to mount procfs at /proc");
 
     // Mount another ramfs as sysfs
-    #[cfg(feature = "sysfs")]
     root_dir // should not fail
         .mount("/sys", mounts::sysfs().unwrap())
         .expect("fail to mount sysfs at /sys");
