@@ -38,13 +38,24 @@ pub mod fops;
 use alloc::sync::Arc;
 use axdriver::{AxDeviceContainer, prelude::*};
 
+
 /// Initializes filesystems by block devices.
-pub fn init_filesystems(mut blk_devs: AxDeviceContainer<AxBlockDevice>) {
+pub fn init_filesystems(mut blk_devs: AxDeviceContainer<AxBlockDevice>, bootargs: Option<&str>) {
     info!("Initialize filesystems...");
 
     let dev = blk_devs.take_one().expect("No block device found!");
     info!("  use block device 0: {:?}", dev.device_name());
     let mut disk = self::dev::Disk::new(dev);
+
+    if bootargs.is_some() {
+        for arg in bootargs.unwrap().split_whitespace() {
+                if arg.starts_with("root=") {
+                    let root_value = arg.strip_prefix("root=").unwrap_or("");
+                    warn!("DTB root value: {}", root_value);
+                    break;
+                }
+            }
+    }
 
     // Try to scan GPT partitions first
     match self::partition::scan_gpt_partitions(&mut disk) {
@@ -55,7 +66,7 @@ pub fn init_filesystems(mut blk_devs: AxDeviceContainer<AxBlockDevice>) {
             );
             // Check if any partition has a supported filesystem
             let has_supported_fs = partitions.iter().any(|p| p.filesystem_type.is_some());
-            if has_supported_fs {
+            if has_supported_fs {      
                 // Try to initialize with partitions
                 let disk_arc = Arc::new(disk);
                 if !self::root::init_rootfs_with_partitions(disk_arc, partitions) {
@@ -74,3 +85,5 @@ pub fn init_filesystems(mut blk_devs: AxDeviceContainer<AxBlockDevice>) {
         }
     }
 }
+
+

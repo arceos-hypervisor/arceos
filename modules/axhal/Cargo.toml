@@ -53,6 +53,7 @@ log = "0.4"
 memory_addr = "0.4"
 page_table_multiarch = {version = "0.5", features = ["copy-from"], optional = true}
 percpu = "0.2"
+fdt-parser = "0.4"
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
 axplat-x86-pc = {workspace = true, optional = true}
