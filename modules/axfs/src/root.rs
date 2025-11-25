@@ -261,6 +261,150 @@ pub(crate) fn init_rootfs_with_partitions(
     true
 }
 
+/// Initialize root filesystem with dynamic partition detection and specified root partition
+pub(crate) fn init_rootfs_with_partitions_and_root_index(
+    disk: Arc<crate::dev::Disk>,
+    partitions: Vec<PartitionInfo>,
+    root_partition_index: Option<usize>,
+) -> bool {
+    info!(
+        "Initializing root filesystem with {} partitions",
+        partitions.len()
+    );
+
+    // Determine which partition to use as root
+    let mut main_fs = None;
+    let mut actual_root_partition_index = None;
+
+    if let Some(index) = root_partition_index {
+        // Use the specified partition index
+        if index < partitions.len() {
+            let partition = &partitions[index];
+            if partition.filesystem_type.is_some() {
+                match create_filesystem_for_partition((*disk).clone(), partition) {
+                    Ok(fs) => {
+                        info!(
+                            "Using specified partition '{}' ({:?}) as root filesystem",
+                            partition.name,
+                            partition.filesystem_type.unwrap_or(FilesystemType::Unknown)
+                        );
+                        main_fs = Some(fs);
+                        actual_root_partition_index = Some(index);
+                    }
+                    Err(e) => {
+                        warn!(
+                            "Failed to create filesystem for specified partition '{}': {:?}",
+                            partition.name, e
+                        );
+                    }
+                }
+            } else {
+                warn!(
+                    "Specified partition '{}' has no supported filesystem",
+                    partition.name
+                );
+            }
+        } else {
+            warn!(
+                "Specified partition index {} is out of range (total partitions: {})",
+                index,
+                partitions.len()
+            );
+        }
+    }
+
+    // If no valid root partition found, fall back to first partition with supported filesystem
+    if main_fs.is_none() {
+        for (i, partition) in partitions.iter().enumerate() {
+            if partition.filesystem_type.is_some() {
+                match create_filesystem_for_partition((*disk).clone(), partition) {
+                    Ok(fs) => {
+                        info!(
+                            "Using partition '{}' ({:?}) as root filesystem",
+                            partition.name,
+                            partition.filesystem_type.unwrap_or(FilesystemType::Unknown)
+                        );
+                        main_fs = Some(fs);
+                        actual_root_partition_index = Some(i);
+                        break;
+                    }
+                    Err(e) => {
+                        warn!(
+                            "Failed to create filesystem for partition '{}': {:?}",
+                            partition.name, e
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    // If no supported filesystem found, fall back to default behavior
+    let main_fs = match main_fs {
+        Some(fs) => fs,
+        None => {
+            warn!("No supported filesystem found in partitions, mount ramfs as rootfs");
+            mounts::ramfs()
+        }
+    };
+
+    let mut root_dir = RootDirectory::new(main_fs);
+
+    // Create /boot directory first if it doesn't exist
+    if let Err(e) = root_dir.main_fs.root_dir().create("/boot", FileType::Dir) {
+        warn!("Failed to create /boot directory: {:?}", e);
+    }
+
+    // Mount additional partitions
+    for (i, partition) in partitions.iter().enumerate() {
+        // Skip root partition
+        if Some(i) == actual_root_partition_index {
+            continue;
+        }
+
+        // Only mount partitions with supported filesystems
+        if partition.filesystem_type.is_some() {
+            match create_filesystem_for_partition((*disk).clone(), partition) {
+                Ok(fs) => {
+                    // Create a static mount path string using sda1, sda2, etc.
+                    let mount_path = format!("/boot/sda{}", i);
+                    info!(
+                        "Mounting partition '{}' at '{}'",
+                        partition.name, mount_path
+                    );
+
+                    // Create mount point directory in root filesystem
+                    if let Err(e) = root_dir
+                        .main_fs
+                        .root_dir()
+                        .create(&mount_path, FileType::Dir)
+                    {
+                        warn!("Failed to create mount point '{}': {:?}", mount_path, e);
+                        continue;
+                    }
+
+                    // Mount filesystem
+                    if let Err(e) = root_dir.mount(&mount_path, fs) {
+                        warn!(
+                            "Failed to mount partition '{}' at '{}': {:?}",
+                            partition.name, mount_path, e
+                        );
+                    }
+                }
+                Err(e) => {
+                    warn!(
+                        "Failed to create filesystem for partition '{}': {:?}",
+                        partition.name, e
+                    );
+                }
+            }
+        }
+    }
+
+    mounted_on_root_dir(root_dir);
+    true
+}
+
 pub fn mounted_on_root_dir(mut root_dir: RootDirectory) {
     root_dir
         .mount("/dev", mounts::devfs())

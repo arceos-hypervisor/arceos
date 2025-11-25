@@ -1,13 +1,13 @@
 use fdt_parser::{Fdt, FdtHeader};
 
-use lazyinit::LazyInit;
 use core::fmt::Write;
+use lazyinit::LazyInit;
 
 static BOOTARGS_STR: LazyInit<heapless::String<256>> = LazyInit::new();
 
 pub fn bootargs_message() -> Option<&'static str> {
     let fdt_addr = crate::get_bootarg();
-    
+
     if fdt_addr == 0 {
         return None;
     }
@@ -38,8 +38,6 @@ pub fn bootargs_message() -> Option<&'static str> {
 
     if let Some(chosen) = fdt.chosen() {
         if let Some(bootargs) = chosen.bootargs() {
-            info!("DTB bootargs: {}", bootargs);
-            
             // Store bootargs in static variable
             let mut bootargs_str = heapless::String::<256>::new();
             if write!(bootargs_str, "{}", bootargs).is_ok() {

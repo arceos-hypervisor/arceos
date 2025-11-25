@@ -21,6 +21,8 @@ pub struct PartitionInfo {
     pub partition_type_guid: [u8; 16],
     /// Unique partition GUID
     pub unique_partition_guid: [u8; 16],
+    /// Filesystem UUID (if available)
+    pub filesystem_uuid: Option<String>,
     /// Starting LBA
     pub starting_lba: u64,
     /// Ending LBA
@@ -118,6 +120,7 @@ pub fn scan_gpt_partitions(disk: &mut Disk) -> AxResult<Vec<PartitionInfo>> {
         name: String::from("disk"),
         partition_type_guid: [0; 16],
         unique_partition_guid: [0; 16],
+        filesystem_uuid: None,
         starting_lba: 0,
         ending_lba: disk_size / 512,
         size_bytes: disk_size,
@@ -175,7 +178,15 @@ fn parse_gpt_partitions(disk: &mut Disk) -> AxResult<Vec<PartitionInfo>> {
     let partition_entry_offset = partition_entry_lba * 512;
     disk.set_position(partition_entry_offset);
 
+    debug!("Partition entry size: {} bytes", size_of_partition_entry);
+    debug!("Partition entry offset: {} bytes", partition_entry_offset);
+
     for i in 0..number_of_partition_entries {
+        // Ensure we're at the correct position for this partition entry
+        let current_entry_offset =
+            partition_entry_offset + (i as u64 * size_of_partition_entry as u64);
+        disk.set_position(current_entry_offset);
+
         let mut entry_data = vec![0u8; size_of_partition_entry as usize];
         if read_exact(disk, &mut entry_data).is_err() {
             warn!("Failed to read partition entry {}", i);
@@ -183,14 +194,42 @@ fn parse_gpt_partitions(disk: &mut Disk) -> AxResult<Vec<PartitionInfo>> {
         }
 
         let entry = if size_of_partition_entry >= 128 {
-            unsafe {
-                core::mem::transmute::<[u8; 128], GptPartitionEntry>(
-                    entry_data[..128].try_into().unwrap(),
-                )
+            // Safely parse the partition entry
+            let partition_type_guid: [u8; 16] = entry_data[0..16].try_into().unwrap();
+            let unique_partition_guid: [u8; 16] = entry_data[16..32].try_into().unwrap();
+            let starting_lba: [u8; 8] = entry_data[32..40].try_into().unwrap();
+            let ending_lba: [u8; 8] = entry_data[40..48].try_into().unwrap();
+            let attributes: [u8; 8] = entry_data[48..56].try_into().unwrap();
+
+            // Read partition name as UTF-16LE
+            let mut partition_name = [0u16; 36];
+            for j in 0..36 {
+                let offset = 56 + j * 2;
+                if offset + 1 < entry_data.len() {
+                    partition_name[j] =
+                        u16::from_le_bytes([entry_data[offset], entry_data[offset + 1]]);
+                }
+            }
+
+            GptPartitionEntry {
+                partition_type_guid,
+                unique_partition_guid,
+                starting_lba,
+                ending_lba,
+                attributes,
+                partition_name,
             }
         } else {
             continue;
         };
+
+        // Debug: Print partition type GUID for all non-empty partitions
+        if !entry.partition_type_guid.iter().all(|&b| b == 0) {
+            debug!(
+                "Partition {}: type GUID: {:?}",
+                i, entry.partition_type_guid
+            );
+        }
 
         // Check if partition is in use (all zeros means unused)
         if entry.partition_type_guid.iter().all(|&b| b == 0) {
@@ -201,30 +240,43 @@ fn parse_gpt_partitions(disk: &mut Disk) -> AxResult<Vec<PartitionInfo>> {
         let ending_lba = u64::from_le_bytes(entry.ending_lba);
         let size_bytes = (ending_lba - starting_lba + 1) * 512;
 
+        debug!(
+            "Partition {}: LBA range {} - {}, size {} bytes",
+            i, starting_lba, ending_lba, size_bytes
+        );
+
         // Convert partition name from UTF-16LE to UTF-8
-        // Copy the packed field to avoid unaligned reference
-        let mut name_utf16 = [0u16; 36];
-        let entry_ptr = &entry as *const GptPartitionEntry as *const u8;
-        let name_ptr = unsafe { entry_ptr.add(56) } as *const u16;
-        unsafe {
-            core::ptr::copy_nonoverlapping(name_ptr, name_utf16.as_mut_ptr(), 36);
-        }
-        let name_str = String::from_utf16_lossy(&name_utf16)
-            .trim_end_matches('\0')
-            .to_owned();
+        let name_str = {
+            let mut name_utf16 = [0u16; 36];
+            for j in 0..36 {
+                name_utf16[j] = entry.partition_name[j];
+            }
+            String::from_utf16_lossy(&name_utf16)
+                .trim_end_matches('\0')
+                .to_owned()
+        };
 
         if name_str.is_empty() {
             continue;
         }
 
-        // Detect filesystem type
-        let filesystem_type = detect_filesystem_type(disk, starting_lba);
+        // Detect filesystem type and read UUID in one go
+        let (filesystem_type, filesystem_uuid) = {
+            let fs_type = detect_filesystem_type(disk, starting_lba);
+            let uuid = if let Some(ref fs) = fs_type {
+                read_filesystem_uuid_simple(disk, starting_lba, fs)
+            } else {
+                None
+            };
+            (fs_type, uuid)
+        };
 
         let partition = PartitionInfo {
             index: i as u32,
             name: name_str,
             partition_type_guid: entry.partition_type_guid,
             unique_partition_guid: entry.unique_partition_guid,
+            filesystem_uuid,
             starting_lba,
             ending_lba,
             size_bytes,
@@ -232,8 +284,12 @@ fn parse_gpt_partitions(disk: &mut Disk) -> AxResult<Vec<PartitionInfo>> {
         };
 
         info!(
-            "Found GPT partition {}: '{}' ({} bytes) with filesystem: {:?}",
-            partition.index, partition.name, partition.size_bytes, partition.filesystem_type
+            "Found GPT partition {}: '{}' ({} bytes) with filesystem: {:?}, UUID: {:?}",
+            partition.index,
+            partition.name,
+            partition.size_bytes,
+            partition.filesystem_type,
+            partition.filesystem_uuid
         );
 
         partitions.push(partition);
@@ -281,6 +337,8 @@ fn parse_mbr_partitions(disk: &mut Disk) -> AxResult<Vec<PartitionInfo>> {
             name: format!("mbr{}", i + 1),
             partition_type_guid: [0; 16],
             unique_partition_guid: [0; 16],
+            filesystem_uuid: None,
+
             starting_lba,
             ending_lba,
             size_bytes,
@@ -437,5 +495,113 @@ pub fn create_filesystem_for_partition(
             warn!("Unknown filesystem type for partition '{}'", partition.name);
             ax_err!(Unsupported, "Unknown filesystem type")
         }
+    }
+}
+
+/// Read filesystem UUID directly from disk without mounting
+/// This reads the UUID from the filesystem superblock
+fn read_filesystem_uuid_simple(
+    disk: &mut Disk,
+    starting_lba: u64,
+    filesystem_type: &FilesystemType,
+) -> Option<String> {
+    match filesystem_type {
+        FilesystemType::Ext4 => read_ext4_uuid(disk, starting_lba),
+        FilesystemType::Fat => read_fat32_uuid(disk, starting_lba),
+        _ => None,
+    }
+}
+
+/// Read UUID from ext4 filesystem superblock
+fn read_ext4_uuid(disk: &mut Disk, starting_lba: u64) -> Option<String> {
+    // Ext4 superblock is at offset 1024 bytes from the start of the partition
+    let superblock_offset = starting_lba * 512 + 1024;
+
+    // Set position to superblock
+    disk.set_position(superblock_offset);
+
+    // Read the superblock (ext4 superblock is 1024 bytes)
+    let mut superblock_data = vec![0u8; 1024];
+    let mut total_read = 0;
+
+    // Read in chunks since read_one might not read all at once
+    while total_read < 1024 {
+        match disk.read_one(&mut superblock_data[total_read..]) {
+            Ok(0) => break, // EOF
+            Ok(n) => total_read += n,
+            Err(_) => return None,
+        }
+    }
+
+    // UUID is at offset 0x68 (104) in the superblock, 16 bytes long
+    if superblock_data.len() >= 120 {
+        let uuid_bytes = &superblock_data[104..120];
+
+        // Convert UUID bytes to string format (8-4-4-4-12)
+        // ext4 stores UUID as little-endian for the first 3 fields and big-endian for the last 2 fields
+        let uuid_str = format!(
+            "{:02x}{:02x}{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}",
+            uuid_bytes[0],
+            uuid_bytes[1],
+            uuid_bytes[2],
+            uuid_bytes[3], // Little endian for first 4 bytes
+            uuid_bytes[4],
+            uuid_bytes[5], // Little endian for next 2 bytes
+            uuid_bytes[6],
+            uuid_bytes[7], // Little endian for next 2 bytes
+            uuid_bytes[8],
+            uuid_bytes[9], // Big endian for next 2 bytes
+            uuid_bytes[10],
+            uuid_bytes[11],
+            uuid_bytes[12],
+            uuid_bytes[13],
+            uuid_bytes[14],
+            uuid_bytes[15] // Big endian for last 6 bytes
+        );
+
+        Some(uuid_str)
+    } else {
+        None
+    }
+}
+
+/// Read UUID from FAT32 filesystem
+fn read_fat32_uuid(disk: &mut Disk, starting_lba: u64) -> Option<String> {
+    // FAT32 boot sector is at the start of the partition
+    let boot_sector_offset = starting_lba * 512;
+
+    // Set position to boot sector
+    disk.set_position(boot_sector_offset);
+
+    // Read the boot sector (512 bytes)
+    let mut boot_sector = vec![0u8; 512];
+    let mut total_read = 0;
+
+    // Read in chunks since read_one might not read all at once
+    while total_read < 512 {
+        match disk.read_one(&mut boot_sector[total_read..]) {
+            Ok(0) => break, // EOF
+            Ok(n) => total_read += n,
+            Err(_) => return None,
+        }
+    }
+
+    // FAT32 doesn't have a standard UUID like ext4, but it has a Volume ID
+    // Volume ID is at offset 0x43 (67) in the boot sector, 4 bytes long
+    if boot_sector.len() >= 71 {
+        let volume_id_bytes = &boot_sector[67..71];
+
+        // Format as 8-character hex string
+        let volume_id_str = format!(
+            "{:02x}{:02x}{:02x}{:02x}",
+            volume_id_bytes[3],
+            volume_id_bytes[2],
+            volume_id_bytes[1],
+            volume_id_bytes[0] // Little endian
+        );
+
+        Some(volume_id_str)
+    } else {
+        None
     }
 }
