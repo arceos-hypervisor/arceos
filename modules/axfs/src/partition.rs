@@ -98,21 +98,7 @@ pub fn scan_gpt_partitions(disk: &mut Disk) -> AxResult<Vec<PartitionInfo>> {
         }
     }
 
-    // If GPT parsing fails, try MBR
-    match parse_mbr_partitions(disk) {
-        Ok(partitions) if !partitions.is_empty() => {
-            info!("Found {} MBR partitions", partitions.len());
-            return Ok(partitions);
-        }
-        Ok(_) => {
-            info!("No MBR partitions found");
-        }
-        Err(e) => {
-            warn!("Failed to parse MBR: {:?}", e);
-        }
-    }
-
-    // If both GPT and MBR fail, treat the whole disk as a single partition
+    // If both GPT fail, treat the whole disk as a single partition
     warn!("No partition table found, treating whole disk as single partition");
     let filesystem_type = detect_filesystem_type(disk, 0);
     let partition = PartitionInfo {
@@ -164,7 +150,6 @@ fn parse_gpt_partitions(disk: &mut Disk) -> AxResult<Vec<PartitionInfo>> {
         partition_entry_array_crc32: header_data[88..92].try_into().unwrap(),
     };
 
-    let header_size = u32::from_le_bytes(header.header_size);
     let partition_entry_lba = u64::from_le_bytes(header.partition_entry_lba);
     let number_of_partition_entries = u32::from_le_bytes(header.number_of_partition_entries);
     let size_of_partition_entry = u32::from_le_bytes(header.size_of_partition_entry);
@@ -223,14 +208,6 @@ fn parse_gpt_partitions(disk: &mut Disk) -> AxResult<Vec<PartitionInfo>> {
             continue;
         };
 
-        // Debug: Print partition type GUID for all non-empty partitions
-        if !entry.partition_type_guid.iter().all(|&b| b == 0) {
-            debug!(
-                "Partition {}: type GUID: {:?}",
-                i, entry.partition_type_guid
-            );
-        }
-
         // Check if partition is in use (all zeros means unused)
         if entry.partition_type_guid.iter().all(|&b| b == 0) {
             continue;
@@ -239,11 +216,6 @@ fn parse_gpt_partitions(disk: &mut Disk) -> AxResult<Vec<PartitionInfo>> {
         let starting_lba = u64::from_le_bytes(entry.starting_lba);
         let ending_lba = u64::from_le_bytes(entry.ending_lba);
         let size_bytes = (ending_lba - starting_lba + 1) * 512;
-
-        debug!(
-            "Partition {}: LBA range {} - {}, size {} bytes",
-            i, starting_lba, ending_lba, size_bytes
-        );
 
         // Convert partition name from UTF-16LE to UTF-8
         let name_str = {
@@ -284,70 +256,8 @@ fn parse_gpt_partitions(disk: &mut Disk) -> AxResult<Vec<PartitionInfo>> {
         };
 
         info!(
-            "Found GPT partition {}: '{}' ({} bytes) with filesystem: {:?}, UUID: {:?}",
-            partition.index,
-            partition.name,
-            partition.size_bytes,
-            partition.filesystem_type,
-            partition.filesystem_uuid
-        );
-
-        partitions.push(partition);
-    }
-
-    Ok(partitions)
-}
-
-/// Parse MBR partition table
-fn parse_mbr_partitions(disk: &mut Disk) -> AxResult<Vec<PartitionInfo>> {
-    let mut partitions = Vec::new();
-
-    // Read MBR from LBA 0
-    let mut mbr_data = [0u8; 512];
-    disk.set_position(0);
-    if read_exact(disk, &mut mbr_data).is_err() {
-        return ax_err!(InvalidData, "Failed to read MBR");
-    }
-
-    // Check for valid MBR signature
-    if mbr_data[510] != 0x55 || mbr_data[511] != 0xAA {
-        return ax_err!(InvalidData, "Invalid MBR signature");
-    }
-
-    // Parse partition entries (4 entries at offset 0x1BE)
-    for i in 0..4 {
-        let entry_offset = 0x1BE + i * 16;
-        let entry = &mbr_data[entry_offset..entry_offset + 16];
-
-        // Check if partition is active (non-zero type)
-        if entry[4] == 0 {
-            continue;
-        }
-
-        let starting_lba = u32::from_le_bytes([entry[8], entry[9], entry[10], entry[11]]) as u64;
-        let size_sectors = u32::from_le_bytes([entry[12], entry[13], entry[14], entry[15]]) as u64;
-        let ending_lba = starting_lba + size_sectors - 1;
-        let size_bytes = size_sectors * 512;
-
-        // Detect filesystem type
-        let filesystem_type = detect_filesystem_type(disk, starting_lba);
-
-        let partition = PartitionInfo {
-            index: i as u32,
-            name: format!("mbr{}", i + 1),
-            partition_type_guid: [0; 16],
-            unique_partition_guid: [0; 16],
-            filesystem_uuid: None,
-
-            starting_lba,
-            ending_lba,
-            size_bytes,
-            filesystem_type,
-        };
-
-        info!(
-            "Found MBR partition {}: '{}' ({} bytes) with filesystem: {:?}",
-            partition.index, partition.name, partition.size_bytes, partition.filesystem_type
+            "Found GPT partition {}: '{}' ({} bytes) with filesystem: {:?}",
+            partition.index, partition.name, partition.size_bytes, partition.filesystem_type,
         );
 
         partitions.push(partition);

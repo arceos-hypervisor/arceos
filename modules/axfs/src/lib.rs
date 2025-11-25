@@ -81,14 +81,11 @@ fn initialize_with_partitions(
 
     // Check if any partition has a supported filesystem
     let has_supported_fs = partitions.iter().any(|p| p.filesystem_type.is_some());
+
     if has_supported_fs {
         // Try to initialize with partitions
         let disk_arc = Arc::new(disk);
-        if !self::root::init_rootfs_with_partitions_and_root_index(
-            disk_arc,
-            partitions,
-            root_partition_index,
-        ) {
+        if !self::root::init_rootfs_with_partitions(disk_arc, partitions, root_partition_index) {
             warn!("Failed to initialize with partitions.");
         }
     } else {
@@ -238,11 +235,5 @@ fn find_root_partition(partitions: &[PartitionInfo], root_spec: &RootSpec) -> Op
         }
     }
 
-    // If no UUID match found, use first partition
-    if root_spec.uuid.is_some() {
-        info!("UUID doesn't match any partition, using first partition");
-        Some(0)
-    } else {
-        None
-    }
+    return None;
 }
