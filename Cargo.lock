@@ -536,7 +536,7 @@ dependencies = [
  "axconfig",
  "axcpu",
  "axlog",
- "axplat",
+ "axplat 0.2.0 (git+https://github.com/arceos-hypervisor/axplat_crates?tag=vmm-v0.3.0)",
  "axplat-aarch64-qemu-virt",
  "axplat-loongarch64-qemu-virt",
  "axplat-riscv64-qemu-virt",
@@ -579,7 +579,7 @@ version = "0.1.0"
 source = "git+https://github.com/arceos-hypervisor/axklib.git#22d120d3cecc905340f31cb6895f8b47f28103a9"
 dependencies = [
  "axerrno",
- "axplat",
+ "axplat 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory_addr",
  "trait-ffi",
 ]
@@ -661,9 +661,24 @@ dependencies = [
 [[package]]
 name = "axplat"
 version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f4de04c54b63bf2ca1ff202733d2516da49d7779649cdb2f9c4ecf22909e6810"
+dependencies = [
+ "axplat-macros 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "bitflags 2.10.0",
+ "const-str",
+ "crate_interface",
+ "handler_table",
+ "kspin",
+ "memory_addr",
+]
+
+[[package]]
+name = "axplat"
+version = "0.2.0"
 source = "git+https://github.com/arceos-hypervisor/axplat_crates?tag=vmm-v0.3.0#3345f58f3da5ef2eafcfa1fcf1ac32e5e80e1a7d"
 dependencies = [
- "axplat-macros",
+ "axplat-macros 0.1.0 (git+https://github.com/arceos-hypervisor/axplat_crates?tag=vmm-v0.3.0)",
  "bitflags 2.10.0",
  "const-str",
  "crate_interface",
@@ -679,7 +694,7 @@ source = "git+https://github.com/arceos-hypervisor/axplat_crates?tag=vmm-v0.3.0#
 dependencies = [
  "axconfig-macros",
  "axcpu",
- "axplat",
+ "axplat 0.2.0 (git+https://github.com/arceos-hypervisor/axplat_crates?tag=vmm-v0.3.0)",
  "axplat-aarch64-peripherals",
  "dw_apb_uart",
  "kspin",
@@ -697,7 +712,7 @@ dependencies = [
  "arm_pl011",
  "arm_pl031",
  "axcpu",
- "axplat",
+ "axplat 0.2.0 (git+https://github.com/arceos-hypervisor/axplat_crates?tag=vmm-v0.3.0)",
  "int_ratio",
  "kspin",
  "lazyinit",
@@ -713,7 +728,7 @@ source = "git+https://github.com/arceos-hypervisor/axplat_crates?tag=vmm-v0.3.0#
 dependencies = [
  "axconfig-macros",
  "axcpu",
- "axplat",
+ "axplat 0.2.0 (git+https://github.com/arceos-hypervisor/axplat_crates?tag=vmm-v0.3.0)",
  "axplat-aarch64-peripherals",
  "log",
  "page_table_entry",
@@ -726,7 +741,7 @@ source = "git+https://github.com/arceos-hypervisor/axplat_crates?tag=vmm-v0.3.0#
 dependencies = [
  "axconfig-macros",
  "axcpu",
- "axplat",
+ "axplat 0.2.0 (git+https://github.com/arceos-hypervisor/axplat_crates?tag=vmm-v0.3.0)",
  "axplat-aarch64-peripherals",
  "log",
  "page_table_entry",
@@ -740,7 +755,7 @@ dependencies = [
  "aarch64-cpu 10.0.0",
  "axconfig-macros",
  "axcpu",
- "axplat",
+ "axplat 0.2.0 (git+https://github.com/arceos-hypervisor/axplat_crates?tag=vmm-v0.3.0)",
  "axplat-aarch64-peripherals",
  "log",
  "page_table_entry",
@@ -753,7 +768,7 @@ source = "git+https://github.com/arceos-hypervisor/axplat_crates?tag=vmm-v0.3.0#
 dependencies = [
  "axconfig-macros",
  "axcpu",
- "axplat",
+ "axplat 0.2.0 (git+https://github.com/arceos-hypervisor/axplat_crates?tag=vmm-v0.3.0)",
  "chrono",
  "kspin",
  "lazyinit",
@@ -761,6 +776,17 @@ dependencies = [
  "loongArch64",
  "ns16550a",
  "page_table_entry",
+]
+
+[[package]]
+name = "axplat-macros"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f90dfaee06a112fe4f810c60af1a86bc080af2172185b491cacc307b84dff748"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.108",
 ]
 
 [[package]]
@@ -780,7 +806,7 @@ source = "git+https://github.com/arceos-hypervisor/axplat_crates?tag=vmm-v0.3.0#
 dependencies = [
  "axconfig-macros",
  "axcpu",
- "axplat",
+ "axplat 0.2.0 (git+https://github.com/arceos-hypervisor/axplat_crates?tag=vmm-v0.3.0)",
  "log",
  "riscv",
  "riscv_goldfish",
@@ -794,7 +820,7 @@ source = "git+https://github.com/arceos-hypervisor/axplat_crates?tag=vmm-v0.3.0#
 dependencies = [
  "axconfig-macros",
  "axcpu",
- "axplat",
+ "axplat 0.2.0 (git+https://github.com/arceos-hypervisor/axplat_crates?tag=vmm-v0.3.0)",
  "bitflags 2.10.0",
  "heapless 0.9.1",
  "int_ratio",
@@ -826,7 +852,7 @@ dependencies = [
  "axlog",
  "axmm",
  "axnet",
- "axplat",
+ "axplat 0.2.0 (git+https://github.com/arceos-hypervisor/axplat_crates?tag=vmm-v0.3.0)",
  "axtask",
  "chrono",
  "crate_interface",
