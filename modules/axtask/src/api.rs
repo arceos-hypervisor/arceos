@@ -73,7 +73,12 @@ pub fn current() -> CurrentTask {
 }
 
 /// Initializes the task scheduler (for the primary CPU).
-pub fn init_scheduler(cpu_num: usize) {
+pub fn init_scheduler() {
+    init_scheduler_with_cpu_num(axconfig::plat::CPU_NUM);
+}
+
+/// Initializes the task scheduler with cpu_num (for the primary CPU).
+pub fn init_scheduler_with_cpu_num(cpu_num: usize) {
     info!("Initialize scheduling...");
     CPU_NUM.store(cpu_num, core::sync::atomic::Ordering::Relaxed);
     crate::run_queue::init();
@@ -83,7 +88,7 @@ pub fn init_scheduler(cpu_num: usize) {
     info!("  use {} scheduler.", Scheduler::scheduler_name());
 }
 
-pub(crate) fn cpu_num() -> usize {
+pub(crate) fn active_cpu_num() -> usize {
     CPU_NUM.load(core::sync::atomic::Ordering::Relaxed)
 }
 

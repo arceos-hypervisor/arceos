@@ -161,7 +161,7 @@ pub fn rust_main(cpu_id: usize, arg: usize) -> ! {
     axhal::init_later(cpu_id, arg);
 
     #[cfg(feature = "multitask")]
-    axtask::init_scheduler(axconfig::plat::CPU_NUM);
+    axtask::init_scheduler();
 
     #[cfg(any(feature = "fs", feature = "net", feature = "display"))]
     {
