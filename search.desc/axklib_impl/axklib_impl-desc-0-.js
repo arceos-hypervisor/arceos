@@ -1,0 +1,1 @@
+searchState.loadedDescShard("axklib_impl", 0, "Platform implementation of the <code>axklib::Klib</code> trait.\nRegister an IRQ handler for the given IRQ number.\nEnable or disable the specified IRQ line.\nMap a physical region by delegating to the memory manager (…\nBusy-wait for the given duration by calling into <code>axhal</code>.")
