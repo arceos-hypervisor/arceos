@@ -1,50 +1,53 @@
-use fdt_parser::{Fdt, FdtHeader};
+//! DTB (Device Tree Blob) related functionality.
+use core::ptr::NonNull;
 
-use core::fmt::Write;
+use fdt_parser::Fdt;
 use lazyinit::LazyInit;
 
-static BOOTARGS_STR: LazyInit<heapless::String<256>> = LazyInit::new();
+static BOOTARG: LazyInit<usize> = LazyInit::new();
 
-pub fn bootargs_message() -> Option<&'static str> {
-    let fdt_addr = crate::get_bootarg();
+/// Initializes the boot argument.
+pub fn init(arg: usize) {
+    BOOTARG.init_once(arg);
+}
 
-    if fdt_addr == 0 {
-        return None;
+/// Returns the boot argument.
+/// This is typically the device tree blob address passed from the bootloader.
+pub fn get_bootarg() -> usize {
+    *BOOTARG
+}
+
+/// Get the cached FDT or initialize it if not already done.
+pub fn get_fdt() -> Option<&'static Fdt<'static>> {
+    static CACHED_FDT: LazyInit<Option<Fdt<'static>>> = LazyInit::new();
+
+    // Return cached FDT if available
+    if let Some(fdt) = CACHED_FDT.get() {
+        return fdt.as_ref();
     }
 
-    let virt_addr = crate::mem::phys_to_virt(crate::mem::PhysAddr::from(fdt_addr)).as_usize();
-
-    let fdt_header = unsafe {
-        let header_size = core::mem::size_of::<FdtHeader>();
-        let ptr = virt_addr as *const u8;
-        core::slice::from_raw_parts(ptr, header_size)
-    };
-
-    let fdt_header = match FdtHeader::from_bytes(fdt_header) {
-        Ok(header) => header,
-        Err(_) => return None,
-    };
-
-    let fdt_bytes = unsafe {
-        let ptr = virt_addr as *const u8;
-        let size = fdt_header.total_size() as usize;
-        core::slice::from_raw_parts(ptr, size)
-    };
-
-    let fdt = match Fdt::from_bytes(fdt_bytes) {
-        Ok(fdt) => fdt,
-        Err(_) => return None,
-    };
-
-    if let Some(chosen) = fdt.chosen() {
-        if let Some(bootargs) = chosen.bootargs() {
-            // Store bootargs in static variable
-            let mut bootargs_str = heapless::String::<256>::new();
-            if write!(bootargs_str, "{}", bootargs).is_ok() {
-                BOOTARGS_STR.init_once(bootargs_str);
-                return Some(BOOTARGS_STR.as_str());
-            }
-        }
+    fn init_fdt() -> Option<Fdt<'static>> {
+        let fdt_paddr = get_bootarg();
+        let fdt_ptr = NonNull::new(crate::mem::phys_to_virt(fdt_paddr.into()).as_mut_ptr())?;
+        Fdt::from_ptr(fdt_ptr).ok()
     }
-    None
+
+    CACHED_FDT.init_once(init_fdt()).as_ref()
+}
+
+/// Get the bootargs chosen from the device tree.
+pub fn get_chosen_bootargs() -> Option<&'static str> {
+    static CACHED_BOOTARGS: LazyInit<Option<&'static str>> = LazyInit::new();
+
+    // If bootargs are already cached, return them
+    if let Some(bootargs) = CACHED_BOOTARGS.get() {
+        return *bootargs;
+    }
+
+    fn init_bootargs() -> Option<&'static str> {
+        let fdt = get_fdt()?;
+        fdt.chosen()?.bootargs()
+    }
+
+    *CACHED_BOOTARGS.init_once(init_bootargs())
 }

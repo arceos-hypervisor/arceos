@@ -28,7 +28,7 @@ cfg-if = "1.0"
 crate_interface = {version = "0.1", optional = true}
 lazyinit = "0.2"
 log = "0.4"
-lwext4_rust = {git = "https://github.com/Josen-B/lwext4_rust.git"}
+lwext4_rust = {git = "https://github.com/Josen-B/lwext4_rust.git", tag ="v1.0"}
 
 [dependencies.fatfs]
 default-features = false
