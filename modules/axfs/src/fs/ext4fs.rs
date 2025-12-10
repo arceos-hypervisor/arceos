@@ -1,5 +1,7 @@
 use crate::alloc::string::{String, ToString};
+
 use alloc::sync::Arc;
+use alloc::format;
 pub use axdriver_block::DevError;
 use axerrno::AxError;
 use axfs_vfs::{
@@ -59,7 +61,11 @@ impl Ext4FileSystem {
             partition.size(),
             partition.position()
         );
-        let inner = Ext4BlockWrapper::<Partition>::new(partition)
+        // Use a unique device name for each partition to avoid conflicts
+        // Use the start LBA as a unique identifier
+        let start_lba = partition.start_lba();
+        let device_name = format!("device_{}", start_lba);
+        let inner = Ext4BlockWrapper::<Partition>::new_with_name(partition, &device_name)
             .expect("failed to initialize EXT4 filesystem on partition");
         let root = Arc::new(FileWrapper::new("/", InodeTypes::EXT4_DE_DIR));
         Ext4FileSystemPartition { inner, root }

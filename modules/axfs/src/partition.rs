@@ -286,13 +286,6 @@ fn detect_filesystem_type(disk: &mut Disk, start_lba: u64) -> Option<FilesystemT
     // Restore position
     disk.set_position(original_position);
 
-    // Debug: print first bytes of boot sector
-    debug!(
-        "Boot sector at LBA {}: first 64 bytes: {:?}",
-        start_lba,
-        &boot_sector[..64]
-    );
-
     // Check for FAT filesystem
     if is_fat_filesystem(&boot_sector) {
         debug!("Detected FAT filesystem at LBA {}", start_lba);

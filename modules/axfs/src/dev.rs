@@ -123,7 +123,7 @@ impl Partition {
         (self.end_lba - self.start_lba + 1) * BLOCK_SIZE as u64
     }
 
-    /// Get the position of the cursor.
+/// Get position of cursor.
     pub fn position(&self) -> u64 {
         self.position
     }
@@ -131,6 +131,11 @@ impl Partition {
     /// Set the position of the cursor.
     pub fn set_position(&mut self, pos: u64) {
         self.position = pos.min(self.size());
+    }
+
+    /// Get the starting LBA of the partition.
+    pub fn start_lba(&self) -> u64 {
+        self.start_lba
     }
 
     /// Read within one block, returns the number of bytes read.
