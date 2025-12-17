@@ -2,9 +2,9 @@
 //!
 //! TODO: it doesn't work very well if the mount points have containment relationships.
 
-use alloc::{borrow::ToOwned, format, string::String, sync::Arc, vec::Vec};
+use alloc::{borrow::ToOwned, collections::BTreeMap, format, string::{String, ToString}, sync::Arc, vec::Vec};
 use axerrno::{AxError, AxResult, ax_err};
-use axfs_vfs::{VfsNodeAttr, VfsNodeOps, VfsNodeRef, VfsNodeType, VfsOps, VfsResult};
+use axfs_vfs::{VfsNodeAttr, VfsNodeOps, VfsNodeRef, VfsNodeType, VfsOps, VfsResult, VfsDirEntry};
 use axns::{ResArc, def_resource};
 use axsync::Mutex;
 use lazyinit::LazyInit;
@@ -159,14 +159,47 @@ impl VfsNodeOps for RootDirectory {
         })
     }
 
-    fn rename(&self, src_path: &str, dst_path: &str) -> VfsResult {
-        self.lookup_mounted_fs(src_path, |fs, rest_path| {
-            if rest_path.is_empty() {
-                ax_err!(PermissionDenied) // cannot rename mount points
-            } else {
-                fs.root_dir().rename(rest_path, dst_path)
+    fn read_dir(&self, start_idx: usize, dirents: &mut [VfsDirEntry]) -> VfsResult<usize> {
+        let mut all_entries = Vec::new();
+
+        // Add mount points
+        for mp in &self.mounts {
+            let name = &mp.path[1..];
+            all_entries.push((name.to_string(), VfsNodeType::Dir));
+        }
+
+        // Add from main_fs
+        let mut main_dirents = Vec::with_capacity(64);
+        for _ in 0..64 {
+            main_dirents.push(VfsDirEntry::default());
+        }
+        let main_count = self.main_fs.root_dir().read_dir(0, &mut main_dirents)?;
+        for i in 0..main_count {
+            let name_bytes = main_dirents[i].name_as_bytes();
+            if let Ok(name_str) = core::str::from_utf8(name_bytes) {
+                if !name_str.is_empty() {
+                    let ty = main_dirents[i].entry_type();
+                    all_entries.push((name_str.to_string(), ty));
+                }
             }
-        })
+        }
+
+        // Unique
+        let mut unique = BTreeMap::new();
+        for (name, ty) in all_entries {
+            unique.insert(name, ty);
+        }
+
+        let unique_vec: Vec<_> = unique.into_iter().collect();
+        let mut count = 0;
+        for (name, ty) in unique_vec.iter().skip(start_idx) {
+            if count >= dirents.len() {
+                break;
+            }
+            dirents[count] = VfsDirEntry::new(name, *ty);
+            count += 1;
+        }
+        Ok(count)
     }
 }
 
@@ -304,7 +337,13 @@ fn mount_single_partition(
 ) {
     match create_filesystem_for_partition((**disk).clone(), partition) {
         Ok(fs) => {
-            let mount_path = format!("/boot/sda{}", index);
+            // Determine mount path based on partition name
+            let mount_path = if partition.name.to_lowercase().contains("boot") {
+                String::from("/boot")
+            } else {
+                format!("/{}", partition.name)
+            };
+            
             info!(
                 "Mounting partition '{}' at '{}'",
                 partition.name, mount_path

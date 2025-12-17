@@ -26,8 +26,8 @@ parted disk.img mklabel gpt
 
 # 创建多个分区
 PART_SIZE=40  # 每个分区40MB
-PART_TYPES=("fat32" "ext4" "fat32" "ext4" "ntfs" "btrfs")
-PART_NAMES=("fat32_1" "ext4_1" "fat32_2" "ext4_2" "ntfs_1" "btrfs_1")
+PART_TYPES=("ext4" "ext4" "fat32" "ext4" "ntfs" "btrfs")
+PART_NAMES=("boot" "rootfs" "fat32_2" "ext4_2" "ntfs_1" "btrfs_1")
 
 for ((i=0; i<PARTITION_COUNT; i++)); do
     START=$((i * PART_SIZE + 1))
