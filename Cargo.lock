@@ -196,7 +196,7 @@ dependencies = [
  "axruntime",
  "axsync",
  "axtask",
- "bindgen 0.72.1",
+ "bindgen",
  "ctor_bare",
  "flatten_objects",
  "lazy_static",
@@ -482,16 +482,13 @@ dependencies = [
  "axfs_ramfs",
  "axfs_vfs",
  "axio",
- "axns",
- "axsync",
- "axtask",
  "cap_access",
- "cfg-if",
  "crate_interface",
  "fatfs",
  "lazyinit",
  "log",
- "lwext4_rust",
+ "rsext4",
+ "spin 0.9.8",
 ]
 
 [[package]]
@@ -542,6 +539,7 @@ dependencies = [
  "axplat-riscv64-qemu-virt",
  "axplat-x86-pc",
  "cfg-if",
+ "fdt-parser",
  "heapless 0.8.0",
  "kernel_guard",
  "lazyinit",
@@ -602,7 +600,7 @@ dependencies = [
  "axerrno",
  "axfeat",
  "axio",
- "bindgen 0.72.1",
+ "bindgen",
 ]
 
 [[package]]
@@ -939,26 +937,6 @@ dependencies = [
  "log",
  "tock-registers 0.8.1",
  "volatile 0.2.7",
-]
-
-[[package]]
-name = "bindgen"
-version = "0.71.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5f58bf3d7db68cfbac37cfc485a8d711e87e064c3d0fe0435b92f7a407f9d6b3"
-dependencies = [
- "bitflags 2.10.0",
- "cexpr",
- "clang-sys",
- "itertools",
- "log",
- "prettyplease",
- "proc-macro2",
- "quote",
- "regex",
- "rustc-hash",
- "shlex",
- "syn 2.0.108",
 ]
 
 [[package]]
@@ -1316,7 +1294,7 @@ checksum = "877a4ace8713b0bcf2a4e7eec82529c029f1d0619886d18145fea96c3ffe5c0f"
 [[package]]
 name = "fatfs"
 version = "0.4.0"
-source = "git+https://github.com/rafalh/rust-fatfs?rev=4eccb50#4eccb50d011146fbed20e133d33b22f3c27292e7"
+source = "git+https://github.com/Josen-B/rust-fatfs.git?rev=41122ef#41122eff7d244cb030c9cfb9b5e14fc50b70dd24"
 dependencies = [
  "bitflags 2.10.0",
  "log",
@@ -1707,15 +1685,6 @@ checksum = "7c9f0d275c70310e2a9d2fc23250c5ac826a73fa828a5f256401f85c5c554283"
 dependencies = [
  "bit_field",
  "bitflags 2.10.0",
-]
-
-[[package]]
-name = "lwext4_rust"
-version = "0.2.0"
-source = "git+https://github.com/Josen-B/lwext4_rust.git#99b3e5c7262718db2002411fe55ea0362a23fdfc"
-dependencies = [
- "bindgen 0.71.1",
- "log",
 ]
 
 [[package]]
@@ -2163,6 +2132,16 @@ dependencies = [
  "const-default",
  "libc",
  "svgbobdoc",
+]
+
+[[package]]
+name = "rsext4"
+version = "0.1.0"
+source = "git+https://github.com/Dirinkbottle/rsext4.git?tag=dev-251222#376e253cc6b8767bc14ca5054fbc1ae49f7a8c8d"
+dependencies = [
+ "bitflags 2.10.0",
+ "lazy_static",
+ "log",
 ]
 
 [[package]]

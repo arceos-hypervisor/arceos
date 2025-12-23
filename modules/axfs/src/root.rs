@@ -5,8 +5,7 @@
 use alloc::{borrow::ToOwned, collections::BTreeMap, format, string::{String, ToString}, sync::Arc, vec::Vec};
 use axerrno::{AxError, AxResult, ax_err};
 use axfs_vfs::{VfsNodeAttr, VfsNodeOps, VfsNodeRef, VfsNodeType, VfsOps, VfsResult, VfsDirEntry};
-use axns::{ResArc, def_resource};
-use axsync::Mutex;
+use spin::Mutex;
 use lazyinit::LazyInit;
 
 use crate::{
@@ -15,10 +14,8 @@ use crate::{
     partition::{FilesystemType, PartitionInfo, create_filesystem_for_partition},
 };
 
-def_resource! {
-    static CURRENT_DIR_PATH: ResArc<Mutex<String>> = ResArc::new();
-    static CURRENT_DIR: ResArc<Mutex<VfsNodeRef>> = ResArc::new();
-}
+static CURRENT_DIR_PATH: Mutex<String> = Mutex::new(String::new());
+static CURRENT_DIR: LazyInit<Mutex<VfsNodeRef>> = LazyInit::new();
 
 struct MountPoint {
     path: String,
@@ -427,8 +424,8 @@ pub fn mounted_on_root_dir(mut root_dir: RootDirectory) {
     // Initialize global state
     let root_dir = Arc::new(root_dir);
     ROOT_DIR.init_once(root_dir.clone());
-    CURRENT_DIR.init_new(Mutex::new(root_dir));
-    CURRENT_DIR_PATH.init_new(Mutex::new(String::from("/")));
+    CURRENT_DIR.init_once(Mutex::new(ROOT_DIR.clone()));
+    *CURRENT_DIR_PATH.lock() = "/".into();
 }
 
 fn parent_node_of(dir: Option<&VfsNodeRef>, path: &str) -> VfsNodeRef {
